@@ -139,7 +139,7 @@ export function riskLabel(input: {
   return { level: "Low", detail: "No actions yet." };
 }
 
-function formatUsdcToBase(usdc: string): string {
+export function formatUsdcToBase(usdc: string): string {
   const [whole = "0", fraction = ""] = usdc.split(".");
   const padded = fraction.padEnd(6, "0").slice(0, 6);
   return (BigInt(whole) * 1_000_000n + BigInt(padded || "0")).toString();
@@ -151,4 +151,52 @@ export function ensState(agent: {
   registration: { state: "REGISTERING" | "FAILED" } | null;
 }): string {
   return agent.registration?.state ?? agent.ens.status;
+}
+
+const RELATIVE = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+
+/** "3 minutes ago", "yesterday". */
+export function formatAgo(iso: string, now = Date.now()): string {
+  const seconds = Math.round((new Date(iso).getTime() - now) / 1000);
+  if (Number.isNaN(seconds)) {
+    return iso;
+  }
+  const steps: [Intl.RelativeTimeFormatUnit, number][] = [
+    ["day", 86_400],
+    ["hour", 3_600],
+    ["minute", 60],
+  ];
+  for (const [unit, size] of steps) {
+    if (Math.abs(seconds) >= size) {
+      return RELATIVE.format(Math.round(seconds / size), unit);
+    }
+  }
+  return "just now";
+}
+
+/** Executed spend per local day, oldest first, `days` long, ending today. */
+export function dailySpend(
+  actions: { status: string; amountBaseUnits: string; createdAt: string }[],
+  days: number,
+  now = new Date(),
+): { day: Date; baseUnits: bigint }[] {
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const buckets = Array.from({ length: days }, (_, index) => {
+    const day = new Date(today);
+    day.setDate(today.getDate() - (days - 1 - index));
+    return { day, baseUnits: 0n };
+  });
+  for (const action of actions) {
+    if (action.status !== "EXECUTED") {
+      continue;
+    }
+    const day = new Date(action.createdAt);
+    day.setHours(0, 0, 0, 0);
+    const bucket = buckets.find((item) => item.day.getTime() === day.getTime());
+    if (bucket) {
+      bucket.baseUnits += BigInt(action.amountBaseUnits);
+    }
+  }
+  return buckets;
 }
