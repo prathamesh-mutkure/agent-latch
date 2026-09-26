@@ -166,7 +166,7 @@ export function ApprovePage() {
       </QueryGate>
       {insideWorldApp ? (
         <Link to="/mini" className="mt-6 inline-block text-sm underline">
-          Back to AgentLatch
+          Back to DSAP
         </Link>
       ) : (
         <Link to="/approvals" className="mt-6 inline-block text-sm underline">

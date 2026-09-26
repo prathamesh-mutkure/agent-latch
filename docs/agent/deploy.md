@@ -27,8 +27,8 @@ Put the Neon project and the Railway service in the same region when both consol
 ## Postgres
 
 1. In the Neon console, create a project. Postgres version **16**. Leave the database name Neon assigns (often `neondb`). The API migrates whichever database `DATABASE_URL` names.
-2. Open the connection string and turn **connection pooling off**. The host must not contain `-pooler`. Startup runs Drizzle migrations on this same URL, and the pooler is the wrong endpoint for that.
-3. Set `DATABASE_URL` on the API to that direct string. Keep `sslmode=require`. If the string also has `channel_binding`, delete that parameter. `postgres` forwards unknown URL parameters as server startup options, and `channel_binding` is a client setting.
+2. Neon shows two strings. `DATABASE_URL` is direct. `DATABASE_URL_POOLED` has `-pooler` in the host. On Railway, set `DATABASE_URL` to the direct string. Do not set `DATABASE_URL_POOLED`. The API reads only `DATABASE_URL`, and startup runs Drizzle migrations on that same URL. The pooler is the wrong endpoint for that.
+3. Keep `sslmode=require`. If the string also has `channel_binding`, delete that parameter. `postgres` forwards unknown URL parameters as server startup options, and `channel_binding` is a client setting.
 
 `DATABASE_URL` looks like:
 
@@ -88,11 +88,11 @@ openssl rand -hex 32
 | `SEPOLIA_RPC_URL` | Public node, which rate-limits ENS reads (`Request exceeds defined limit.`). Set a keyed Sepolia URL. |
 | `ENS_REGISTRY_ADDRESS` | Sepolia ETHRegistry. |
 | `WORLDCHAIN_RPC_URL` | Public World Chain endpoint, used for Safe EIP-1271 checks. |
-| `X402_PAY_TO` | Demo signer `0x142B99367b928608835501633534411EFc467737`. The facilitator settles only to this address. |
+| `X402_PAY_TO` | Demo signer `0x142B99367b928608835501633534411EFc467737`. Leave unset for that demo. The facilitator settles only to this address. |
 | `FACILITATOR_PRIVATE_KEY` | Falls back to `EXECUTOR_PRIVATE_KEY`. Pays Sepolia gas for the demo seller. |
-| `FACILITATOR_URL` | `http://localhost:$PORT/facilitator` on the same instance, which is how the seller reaches itself. |
+| `FACILITATOR_URL` | Leave unset. The seller calls `http://localhost:$PORT/facilitator` on the same Railway process. Railway sets `PORT`. |
 
-`USDC_ADDRESS` and `X402_NETWORK` are in `.env.example` and the API does not read them. The network is `eip155:11155111` in code.
+The API does not read `USDC_ADDRESS`, `X402_NETWORK`, `DATABASE_URL_POOLED`, `WORLD_REDIRECT_URI`, or `COOKIE_SECRET`. Circle USDC and `eip155:11155111` are constants in code.
 
 These are not API variables. They do not go on the web app.
 
@@ -134,7 +134,7 @@ Point `API_URL` at the deployed API. Keep `AGENT_ID`, `AGENT_KEY`, `AGENT_PRIVAT
 ```json
 {
   "mcpServers": {
-    "agentlatch": {
+    "dsap": {
       "command": "bun",
       "args": ["/absolute/path/to/agent-latch/apps/mcp/src/index.ts"],
       "env": {
@@ -180,7 +180,7 @@ curl -sS "https://www.dsapprotocol.xyz/api/world/config"
 
 `/health` returns `"database": "up"`. `/world/config` returns `"worldIdReady": true`.
 
-Sign in on `https://www.dsapprotocol.xyz`. The session is in local storage under `agentlatch.session` (field `token`). Then:
+Sign in on `https://www.dsapprotocol.xyz`. The session is in local storage under `dsap.session` (field `token`). Then:
 
 ```sh
 curl -sS "https://www.dsapprotocol.xyz/api/agents" \

@@ -58,14 +58,14 @@ function payment(action: Action) {
   };
 }
 
-const server = new McpServer({ name: "agentlatch", version: "0.0.0" });
+const server = new McpServer({ name: "dsap", version: "0.0.0" });
 
 server.registerTool(
   "list_merchants",
   {
     title: "List x402 merchants",
     description:
-      "Lists the x402 sellers in AgentLatch's registry, with their resource URL and price in Circle USDC on Ethereum Sepolia.",
+      "Lists the x402 sellers in DSAP's registry, with their resource URL and price in Circle USDC on Ethereum Sepolia.",
     annotations: { readOnlyHint: true },
   },
   async () => {
@@ -88,7 +88,7 @@ server.registerTool(
   {
     title: "Quote an x402 resource",
     description:
-      "Asks an x402 resource URL for its price without paying. Returns the USDC price and payee, or why AgentLatch cannot pay it.",
+      "Asks an x402 resource URL for its price without paying. Returns the USDC price and payee, or why DSAP cannot pay it.",
     inputSchema: { url: z.url().describe("The x402 resource URL.") },
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
@@ -114,7 +114,7 @@ server.registerTool(
   {
     title: "Pay an x402 resource",
     description:
-      "Pays an x402 resource through AgentLatch. The agent's ENS policy decides: it pays now, waits for a human in World App, or blocks. Intercepta screens the payee first. Refuses when the price is above maxAmountUsdc.",
+      "Pays an x402 resource through DSAP. The agent's ENS policy decides: it pays now, waits for a human in World App, or blocks. Intercepta screens the payee first. Refuses when the price is above maxAmountUsdc.",
     inputSchema: {
       url: z.url().describe("The x402 resource URL."),
       maxAmountUsdc: z
@@ -171,7 +171,7 @@ server.registerTool(
   {
     title: "Request a swap",
     description:
-      "Asks AgentLatch to swap USDC to Sepolia WETH. The agent's ENS policy decides: it runs now, waits for a human in World App, or blocks.",
+      "Asks DSAP to swap USDC to Sepolia WETH. The agent's ENS policy decides: it runs now, waits for a human in World App, or blocks.",
     inputSchema: {
       amountUsdc: z.string().describe("USDC amount, for example 0.2 or 0.5."),
       note: z.string().optional().describe("Why the agent is swapping."),

@@ -18,7 +18,7 @@ if (existsSync(rootEnv)) {
 }
 
 export const apiUrl = process.env.API_URL ?? "http://localhost:3001";
-/** The agent this process acts for. Its owner creates it in AgentLatch first. */
+/** The agent this process acts for. Its owner creates it in DSAP first. */
 export const agentId = process.env.AGENT_ID?.trim() || null;
 /** Shown once on the agent's page. Sent as `x-agent-key`. */
 export const agentKey = process.env.AGENT_KEY?.trim() || null;

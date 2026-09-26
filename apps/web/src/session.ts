@@ -3,7 +3,7 @@ import { useSyncExternalStore } from "react";
 /** Owner session from the API. The token goes out as `Authorization: Bearer`. */
 export type Session = { token: string; wallet: string; expiresAt: string };
 
-const SESSION_KEY = "agentlatch.session";
+const SESSION_KEY = "dsap.session";
 const listeners = new Set<() => void>();
 
 function load(): Session | null {

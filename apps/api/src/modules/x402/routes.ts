@@ -50,7 +50,7 @@ async function callFacilitator<T>(
   }
 }
 
-const DESCRIPTION = "AgentLatch paid resource. 0.01 USDC on Ethereum Sepolia.";
+const DESCRIPTION = "DSAP paid resource. 0.01 USDC on Ethereum Sepolia.";
 
 function quote(
   url: string,
@@ -65,7 +65,7 @@ function quote(
   });
 }
 
-/** One entry in AgentLatch's own seller registry. */
+/** One entry in DSAP's own seller registry. */
 export type Merchant = {
   id: string;
   name: string;
@@ -173,8 +173,8 @@ export const x402Routes = new Elysia()
       merchant(
         origin,
         {
-          id: "agentlatch-demo",
-          name: "AgentLatch demo seller",
+          id: "dsap-demo",
+          name: "DSAP demo seller",
           description: DESCRIPTION,
           path: "/x402/resource",
         },

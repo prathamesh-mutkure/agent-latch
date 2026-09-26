@@ -16,7 +16,7 @@ export type Quote = {
 
 /**
  * Reads a resource's x402 price without paying. Only exact Circle USDC on
- * Ethereum Sepolia can be paid through AgentLatch.
+ * Ethereum Sepolia can be paid through DSAP.
  */
 export async function quote(url: string): Promise<Quote> {
   const parsed = new URL(url);

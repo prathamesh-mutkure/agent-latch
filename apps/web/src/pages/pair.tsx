@@ -109,7 +109,7 @@ export function PairPage() {
         ) : null}
       </Panel>
       <Link to="/mini" className="mt-6 inline-block text-sm underline">
-        Back to AgentLatch
+        Back to DSAP
       </Link>
     </>
   );

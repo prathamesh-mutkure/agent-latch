@@ -48,9 +48,11 @@ function ConsoleShell() {
       <aside className="flex flex-col border-b border-line bg-ink text-paper md:min-h-screen md:border-r md:border-b-0">
         <div className="px-4 py-5">
           <Link to="/" className="text-base font-semibold tracking-tight">
-            AgentLatch
+            DSAP
           </Link>
-          <p className="mt-1 text-xs text-paper/60">Control plane</p>
+          <p className="mt-1 text-xs leading-snug text-paper/60">
+            Delegated Spend Authorization Protocol
+          </p>
         </div>
         {session ? (
           <nav className="flex gap-1 overflow-x-auto px-3 pb-4 md:grid md:px-3">

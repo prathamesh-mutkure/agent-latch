@@ -15,7 +15,7 @@ function rpcUrl(): string {
   return process.env.SEPOLIA_RPC_URL ?? DEFAULT_RPC;
 }
 
-/** The facilitator pays gas only for AgentLatch's own sellers. */
+/** The facilitator pays gas only for DSAP's own sellers. */
 function ownSeller(request: FacilitatorRequest): boolean {
   const target = request?.paymentRequirements?.payTo;
   return (

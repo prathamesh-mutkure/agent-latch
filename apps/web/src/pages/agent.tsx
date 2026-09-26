@@ -240,7 +240,7 @@ function AgentKey({ agentId, hasKey }: { agentId: string; hasKey: boolean }) {
   const [key, setKey] = useState<string | null>(null);
   const snippet = `{
   "mcpServers": {
-    "agentlatch": {
+    "dsap": {
       "command": "bun",
       "args": ["apps/mcp/src/index.ts"],
       "env": {

@@ -34,7 +34,7 @@ bun --filter @agentlatch/agent dev
 
 It acts for the agent in `AGENT_ID` and sends `AGENT_KEY` as `x-agent-key`. It cycles three swaps: 0.2 USDC (allow), 0.5 USDC (waits for approval), 2 USDC (block). It does not approve itself, list agents, create agents, or change policy. Without `AGENT_ID` and `AGENT_KEY` it idles. Copy both from the agent's page. The key is shown once.
 
-Owner routes need a session: `Authorization: Bearer <token>`. Sign in on the dashboard, then copy the token from local storage key `agentlatch.session` (field `token`). `GET /agents/:id` adds an `ens` object read from Sepolia ENSv2. Register the agent's label with:
+Owner routes need a session: `Authorization: Bearer <token>`. Sign in on the dashboard, then copy the token from local storage key `dsap.session` (field `token`). `GET /agents/:id` adds an `ens` object read from Sepolia ENSv2. Register the agent's label with:
 
 ```sh
 curl -X POST "http://localhost:3001/agents/<agentId>/ens" \
@@ -81,7 +81,7 @@ Tools: `list_merchants` (`GET /x402/merchants`), `quote_resource` (reads the 402
 
 ```sh
 bun apps/mcp/src/index.ts
-claude mcp add agentlatch -e API_URL=http://localhost:3001 -- bun "$PWD/apps/mcp/src/index.ts"
+claude mcp add dsap -e API_URL=http://localhost:3001 -- bun "$PWD/apps/mcp/src/index.ts"
 ```
 
 Cursor or Claude Desktop:
@@ -89,7 +89,7 @@ Cursor or Claude Desktop:
 ```json
 {
   "mcpServers": {
-    "agentlatch": {
+    "dsap": {
       "command": "bun",
       "args": ["/absolute/path/to/agent-latch/apps/mcp/src/index.ts"],
       "env": {

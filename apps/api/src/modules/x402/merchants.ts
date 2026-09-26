@@ -84,7 +84,7 @@ async function chainSnapshot() {
   };
 }
 
-/** AgentLatch's demo sellers. Prices run from 0.1 to 0.6 USDC. */
+/** DSAP's demo sellers. Prices run from 0.1 to 0.6 USDC. */
 export const catalog: Catalog[] = [
   {
     id: "omikuji",

@@ -66,7 +66,7 @@ export function SignInPage() {
     <>
       <PageHeader
         title="Sign in"
-        detail="AgentLatch accounts are World App wallets. Your agents, their rules, and their approvals show up here once you sign in. The first sign-in creates your account."
+        detail="DSAP accounts are World App wallets. Your agents, their rules, and their approvals show up here once you sign in. The first sign-in creates your account."
       />
       <Panel>
         {!appId ? (
@@ -86,7 +86,7 @@ export function SignInPage() {
             </div>
             <div className="grid gap-3">
               <p className="text-sm">
-                Scan with your phone's camera. It opens AgentLatch in World App.
+                Scan with your phone's camera. It opens DSAP in World App.
                 Check that the phone shows this code, then tap Sign in.
               </p>
               <p className="font-mono text-3xl font-semibold tracking-widest">
