@@ -7,6 +7,11 @@ import {
   USDC_SEPOLIA_ADDRESS,
   UsdcAmountError,
 } from "@agentlatch/core";
+import {
+  InterceptaError,
+  type PaymentScreen,
+  screenPayment,
+} from "@agentlatch/intercepta";
 import { and, asc, eq, gte } from "drizzle-orm";
 import { db } from "../../db/client";
 import { saveExecution } from "../../executor";
@@ -67,21 +72,35 @@ export async function submitAction(input: {
 
   const now = new Date();
   const token = (input.token ?? USDC_SEPOLIA_ADDRESS).toLowerCase();
-  const decision = evaluatePolicy({
+  const target = input.target.trim();
+  let decision = evaluatePolicy({
     policy: await getPolicy(input.agentId),
     action: input.action,
-    target: input.target,
+    target,
     token,
     amount,
     spentToday: await spentToday(input.agentId, now),
   });
+
+  if (input.action === "X402_PAYMENT" && decision.decision !== "BLOCK") {
+    const screened = await screenPayee(target);
+    if (!screened.ok) {
+      return screened;
+    }
+    decision = screened.value.blocked
+      ? { decision: "BLOCK", reasons: [screened.value.detail] }
+      : {
+          decision: decision.decision,
+          reasons: [...decision.reasons, screened.value.detail],
+        };
+  }
 
   const id = crypto.randomUUID();
   const action: ActionRequest = {
     id,
     agentId: input.agentId,
     action: input.action,
-    target: input.target.trim(),
+    target,
     token,
     amount: amount.toString(),
     nonce: id,
@@ -147,6 +166,40 @@ export async function submitAction(input: {
     `${action.agentId} ${action.action} ${formatUsdc(action.amount)} USDC -> ${action.decision}`,
   );
   return { ok: true, value: action };
+}
+
+function isPayee(value: string): boolean {
+  return (
+    /^0x[0-9a-fA-F]{40}$/.test(value) ||
+    /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(value)
+  );
+}
+
+async function screenPayee(
+  payTo: string,
+): Promise<Success<PaymentScreen> | Failure> {
+  if (!isPayee(payTo)) {
+    return {
+      ok: false,
+      status: 400,
+      error: "Payment target must be an Ethereum address or ENS name.",
+    };
+  }
+  try {
+    return {
+      ok: true,
+      value: await screenPayment({
+        payTo,
+        apiKey: process.env.INTERCEPTA_API_KEY ?? "",
+      }),
+    };
+  } catch (error) {
+    const message =
+      error instanceof InterceptaError
+        ? error.message
+        : "Intercepta screening failed.";
+    return { ok: false, status: 400, error: message };
+  }
 }
 
 async function spentToday(agentId: string, now: Date): Promise<bigint> {

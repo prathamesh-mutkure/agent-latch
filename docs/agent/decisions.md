@@ -101,6 +101,14 @@ Supersedes the `POST /agents/:id/ens` sentence in "ENSv2".
 - Registration deploys a UserRegistry through the Sepolia Verifiable Factory when `getSubregistry` is empty, then `setSubregistry`, `setParent`, and `register`.
 - The signer is `EXECUTOR_PRIVATE_KEY` and must be the parent owner. Sepolia ETH pays gas.
 
+## 2026-09-26 — Intercepta quick scan
+
+- `@agentlatch/intercepta` calls `GET https://api.web3antivirus.io/api/public/v2/extension/account/{address}/quick-scan` with header `X-API-KEY`. Docs: https://docs.web3antivirus.io/reference/quick-scan-address
+- Scan Message stays unused. Its chain id list does not include Sepolia `11155111`.
+- A payment is blocked when `toxicScore` is above 0 or any trait is returned. Those traits are the suspicious-activity list. The docs do not publish a higher cutoff.
+- Policy does not import Intercepta. The action service screens `X402_PAYMENT` after policy and before execution. A missing `INTERCEPTA_API_KEY` refuses the payment.
+- x402 signing is still later. A clear screen uses the existing simulated execution.
+
 ## How to change a decision
 
 Add a new dated section that names what it supersedes. Leave the old section in place and mark it superseded.

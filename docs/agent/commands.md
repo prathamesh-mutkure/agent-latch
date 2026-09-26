@@ -50,6 +50,14 @@ curl -X POST "http://localhost:3001/approvals/<approvalId>/reject"
 
 The dashboard at http://localhost:5173 calls those same routes.
 
+`X402_PAYMENT` screens `target` with the Intercepta quick scan before execution. Set `INTERCEPTA_API_KEY`. A missing key refuses the payment. Swaps do not call Intercepta.
+
+```sh
+curl -X POST "http://localhost:3001/agents/<agentId>/actions" \
+  -H "content-type: application/json" \
+  -d '{"action":"X402_PAYMENT","target":"0x0000000000000000000000000000000000000001","amount":"1"}'
+```
+
 Env, all optional:
 
 ```sh
