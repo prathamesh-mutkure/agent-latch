@@ -355,6 +355,24 @@ Supersedes the ngrok fetch header in "World App is the only human surface".
 - Unchanged identifiers: the MCP server id `dsap`, the `@agentlatch/*` packages, the `agent-latch.eth` ENS parent, and the `dsapprotocol.xyz` and `dsap-protocol.onrender.com` hosts.
 - The World App push title is "Approval needed", because push titles are short.
 
+## 2026-09-27 — A v4 hook shows the latch on chain, outside the product path
+
+Does not supersede "USDC transfers and one Uniswap swap settle on Sepolia". `SWAP` still runs through SwapRouter02.
+
+- `contracts/latch-hook` holds `LatchGateHook`, a v4 `beforeSwap` hook built from uniswapfoundation/v4-template. It refuses a swap unless `hookData` carries a permit that the latch signer signed (EIP-191). The permit is bound to one action id, the pool, the direction, the exact `amountSpecified`, `humanApproved`, and a deadline. Each action id works once.
+- The hook checks the latch signature, not the human. World App wallets live on World Chain, and the World ID for Agents result is checked by the API, so neither can be verified on Sepolia. Limits stay in the policy engine.
+- Deployed on Sepolia at `0x9A3b22908730Fda371E546d9C7ED30e063E28080`, with the executor key as the latch signer, on its own USDC/WETH pool (fee 3000, tick spacing 60) seeded with 1 USDC. One permitted 0.1 USDC swap ran from a Foundry script.
+- The API does not sign permits or route swaps to this pool. Wiring it in, and deciding whether a separate latch key signs permits, waits on the signer custody question.
+- `contracts/latch-hook/lib` is not committed. Biome skips `contracts/`.
+
+## 2026-09-27 — ETHGlobal prize tracks are World, ENS, and Uniswap
+
+Does not change product behavior. Intercepta still screens `X402_PAYMENT` after policy and before signing.
+
+- We apply for Best Use of World ID for Agents, Best Use of ENSv2, and Best Uniswap Stack Contribution. Those are the main-track prizes, not Continuity.
+- The Uniswap submission leads with `LatchGateHook`. Live agent `SWAP` still settles on v3 SwapRouter02.
+- Intercepta stays in the product description and the x402 path. We do not apply for the Intercepta prize.
+
 ## How to change a decision
 
 Add a new dated section that names what it supersedes. Leave the old section in place and mark it superseded.

@@ -21,7 +21,7 @@ The client secret, device code, and World `sub` stay on the API. Public reads sh
 
 - **Browser authorization-code flow:** first integrated on 26 Sep at 21:14 JST. It never produced a reliable approval that matched the owner, and we dropped it on 27 Sep at 02:51 JST, about 5.5 hours later.
 - **Device grant:** our client got its first device code about 2 minutes after we read the `oidc` guide (27 Sep, about 03:12 JST). The whole backend journey passed against the live sandbox about 30 minutes later: start, poll, validate, execute, deny, expire, and resume after a restart.
-- **First human-completed approval on a phone:** not run at the time of writing. Record it here after the phone run.
+- **First human-completed approval on a phone:** done on the live site by 07:34 JST on 27 Sep, about 4 hours after the backend journey first passed. The owner signed Approve in World App, completed World ID, and the API validated the token before the action ran.
 
 ## Friction
 

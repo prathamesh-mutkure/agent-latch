@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!db/migrations"]
+    "includes": ["**", "!db/migrations", "!contracts"]
   },
   "formatter": {
     "enabled": true,
