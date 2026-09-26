@@ -6,7 +6,7 @@ Rewrite the row you changed. Do not append a diary. Commands live in `commands.m
 
 ## In progress
 
-- World ID, phase 5, in `packages/integrations/world`. Ankit. He owns the approval check. Leave that package alone.
+- World ID, phase 5, in `packages/integrations/world`. Ankit. The approval shape is open in `open-questions.md`. Read `planning-v2.md` and `continuation.md`. Leave that package alone.
 
 ## Todos
 
@@ -18,8 +18,10 @@ Rewrite the row you changed. Do not append a diary. Commands live in `commands.m
 | 3 | Background agent | done | passed | 100 allow, 2500 waits, 10000 block |
 | 4 | ENSv2 | done | passed | `trader.agent-latch.eth` registered |
 | 7 | Dashboard | done | passed | `apps/web`. Eden client in `packages/api-client` |
-| 5 | World ID for Agents | in progress | not started | Ankit. `packages/integrations/world` and the approval check |
+| 5 | World ID for Agents | in progress | not started | Ankit. `packages/integrations/world`. Shape is open in `open-questions.md` |
 | 6 | Intercepta + x402 | done | passed | Quick scan and a signed Sepolia USDC settlement |
+| later | ENS gate and resolver | todo | not started | After the Postgres policy path is finished. Refuse a missing or expired name. Set resolver and `addr`. Policy stays in Postgres |
+| last | Policy on ENS | todo | not started | Publish rules onto ENS. A looser edit needs a fresh approval. Tighter edits write immediately |
 | 8 | World mini app | todo | not started | After phase 5 |
 | 9 | Uniswap | todo | not started | Optional, last |
 | 10 | Hackathon polish | todo | not started | |
@@ -49,6 +51,6 @@ No unit test suite. Checks are `bun run typecheck` and `bun run lint`.
 - `ens.name` is set when ENSjs returns an owner or the registry status is `REGISTERED`.
 - Sepolia demo signer: `0x142B99367b928608835501633534411EFc467737`. Parent name: `agent-latch.eth`.
 - `POST /agents/:id/ens` deploys a UserRegistry under `ENS_PARENT_NAME` when needed, then registers the agent label. The signer must be the parent owner and hold Sepolia ETH.
-- Simulated execution never signs. Policy stays free of sponsors.
+- Swaps stay unsigned. An x402 settlement signs and broadcasts. Policy stays free of sponsors.
 - The dashboard polls the API. The API allows the dashboard origin. Approve and reject response bodies are unchanged.
 - The payments page lists `X402_PAYMENT` actions. Each one is quick-scanned before execution. A clear scan settles Circle USDC with EIP-3009. The signer pays Sepolia gas. A missing key, a 404 from the scan, or a failed settlement refuses the payment. Live traits may omit `txsCount`.

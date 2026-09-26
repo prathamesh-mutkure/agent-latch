@@ -1,15 +1,15 @@
 # AgentLatch --- ETHGlobal Tokyo 2026
 
+> Original product brief. The updated architecture is [planning-v2.md](planning-v2.md). Locked deltas, open items, and the next steps are in [continuation.md](continuation.md). This file stays the original brief.
+
 > **Status:** Project context / implementation brief\
 > **Purpose:** Give the coding agent the complete product, technical,
 > sponsor, architecture, and phased implementation context.\
 > **Primary goal:** Build a working, polished hackathon project
 > incrementally.\
 > **Important:** The coding agent is responsible for scaffolding,
-> implementation, integrations, tests, and setup. This document is the
-> source of truth for the intended product direction, but implementation
-> details may be adapted when necessary to make the system work reliably
-> within the hackathon.
+> implementation, integrations, tests, and setup. Direction that
+> conflicts with [continuation.md](continuation.md) follows that file.
 
 ------------------------------------------------------------------------
 

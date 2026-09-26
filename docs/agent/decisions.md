@@ -107,7 +107,7 @@ Supersedes the `POST /agents/:id/ens` sentence in "ENSv2".
 - Scan Message stays unused. Its chain id list does not include Sepolia `11155111`.
 - A payment is blocked when `toxicScore` is above 0 or any trait is returned. Those traits are the suspicious-activity list. The docs do not publish a higher cutoff.
 - Policy does not import Intercepta. The action service screens `X402_PAYMENT` after policy and before execution. A missing `INTERCEPTA_API_KEY` refuses the payment.
-- x402 signing is still later. A clear screen uses the existing simulated execution.
+- x402 signing is still later. A clear screen uses the existing simulated execution. Superseded the same day by "x402 settles on Ethereum Sepolia" below. Intercepta still screens before settlement.
 
 ## 2026-09-26 — x402 settles on Ethereum Sepolia
 
@@ -115,6 +115,16 @@ Supersedes the `POST /agents/:id/ens` sentence in "ENSv2".
 - The public x402.org facilitator and PayAI do not list that network. CDP does not either. Paratro lists it, but `/x402/settle` only broadcasts authorizations it signed itself. Do not move the demo to Base to follow those lists.
 - Settlement is on-chain. The signer first signs an EIP-712 `transferWithAuthorization` message. That signature does not move USDC. The same signer then sends the Sepolia transaction that submits the signature to the USDC contract, and pays the gas. A facilitator would normally send that transaction. "Outside signature" means the authorization was signed by our demo key, not by a facilitator's wallet. Policy and Intercepta still run before the broadcast.
 - `AgentSigner` lives in `@agentlatch/core`. `LocalKeySigner` reads `EXECUTOR_PRIVATE_KEY`. The executor receives the signer and does not read the key.
+
+## 2026-09-26 — Continuation from planning-v2
+
+Supersedes the parts of `planning-v2.md` that use Base, a Hono seller service, drop Intercepta, rename the product, or store policy in ENS now. The handoff is `continuation.md`.
+
+- Policy stays in Postgres. `evaluatePolicy` reads the `policies` table. ENS stays identity. Copying rules onto ENS text records is last, after the Postgres policy path is finished.
+- Payments stay on Ethereum Sepolia. Do not add Base.
+- Intercepta stays. The action service screens `X402_PAYMENT` after policy and before signing.
+- Stack stays this repo: Elysia, Drizzle, and the current packages. `GET /x402/resource` is the paid resource. Do not add a Hono seller app. Do not rename the product. Do not replace `ActionRequest` with `POST /api/v1/fetch`.
+- Signer custody and the World approval shape stay open in `open-questions.md`.
 
 ## How to change a decision
 

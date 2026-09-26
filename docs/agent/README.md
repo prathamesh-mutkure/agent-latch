@@ -4,7 +4,9 @@ Short on purpose. Coding agents load this folder, so keep it current and small.
 
 | File | What it is | When to change it |
 | --- | --- | --- |
-| `planning.md` | Product brief and phase plan. Source of truth for what we are building. | Product direction changes. Not a changelog. |
+| `planning.md` | Original product brief and phase plan. | Product direction changes. Not a changelog. |
+| `planning-v2.md` | Updated architecture. | The architecture changes. Where it disagrees with the repo, `continuation.md` wins. |
+| `continuation.md` | Locked deltas, open items for Ankit, and the step order. | A lock, an open item, or the next step changes. |
 | `decisions.md` | Closed technical choices. | A choice is made or reversed. Add a dated entry. Mark the old one superseded. Do not delete history. |
 | `open-questions.md` | Choices we have not made. | Add a question, or delete it after it moves into `decisions.md`. |
 | `current-state.md` | Todos with a testing column, plus a testing section and notes. | After every task. Update that row's state and testing column, and the testing section when you verified something. Do not append a diary. |
