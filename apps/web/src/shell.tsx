@@ -10,6 +10,7 @@ const links = [
   { to: "/activity", label: "Activity", exact: false },
   { to: "/approvals", label: "Approvals", exact: false },
   { to: "/payments", label: "Payments", exact: false },
+  { to: "/mini", label: "World App", exact: true },
 ] as const;
 
 export function Shell() {

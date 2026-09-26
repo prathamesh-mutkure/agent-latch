@@ -8,6 +8,8 @@ import {
   listAgents,
   listApprovals,
   listAudit,
+  listMyApprovals,
+  worldAppId,
 } from "./api";
 
 const live = {
@@ -110,6 +112,25 @@ export function useMe() {
     queryKey: ["me"],
     queryFn: getMe,
     refetchInterval: 30_000,
+    ...live,
+  });
+}
+
+export function useWorldAppId() {
+  return useQuery({
+    queryKey: ["world-app"],
+    queryFn: worldAppId,
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: 1,
+  });
+}
+
+export function useMyApprovals(enabled: boolean) {
+  return useQuery({
+    queryKey: ["my-approvals"],
+    queryFn: listMyApprovals,
+    enabled,
+    refetchInterval: 2_000,
     ...live,
   });
 }

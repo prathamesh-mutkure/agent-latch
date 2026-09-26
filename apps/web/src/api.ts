@@ -120,6 +120,50 @@ export async function signOut() {
   await fetch("/auth/logout", { method: "POST" });
 }
 
+export async function worldAppId(): Promise<string | null> {
+  const response = await fetch("/auth/world/app");
+  if (!response.ok) {
+    return null;
+  }
+  const body = (await response.json()) as { appId?: string | null };
+  return body.appId ?? null;
+}
+
+export async function worldNonce(): Promise<string> {
+  const response = await fetch("/auth/world/nonce");
+  const body = (await response.json()) as { nonce?: string; error?: string };
+  if (!response.ok || !body.nonce) {
+    throw new Error(body.error ?? "Could not start the wallet link.");
+  }
+  return body.nonce;
+}
+
+export async function saveWorldWallet(payload: {
+  address: string;
+  message: string;
+  signature: string;
+}): Promise<void> {
+  const response = await fetch("/auth/world/wallet", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = (await response.json()) as { error?: string };
+  if (!response.ok) {
+    throw new Error(body.error ?? "Could not link the World App wallet.");
+  }
+}
+
+export async function listMyApprovals() {
+  const data = await read(client.me.approvals.get());
+  if (isErrorBody(data) || !Array.isArray(data)) {
+    throw new Error(
+      isErrorBody(data) ? data.error : "Unexpected approvals response.",
+    );
+  }
+  return data;
+}
+
 export async function claimAgent(agentId: string) {
   const data = await read(client.agents({ agentId }).claim.post());
   if (isErrorBody(data)) {

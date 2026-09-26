@@ -169,6 +169,15 @@ Supersedes the deny bullet in "World ID for Agents".
 - Backing out of World during a deny leaves the approval `PENDING`. Backing out during an approve still sets `CANCELLED`.
 - After the World checks pass, approve runs the ENS passport check from "ENS name gates actions" before executing. A missing or expired name sets `FAILED: PASSPORT_INACTIVE`. An ENS read failure executes nothing and leaves the approval `PENDING`.
 
+## 2026-09-26 — World App notifications
+
+The mini app is the phone surface for approvals. It does not replace the World ID step-up, and it does not sign.
+
+- The owner is the World ID `(iss, sub)` from sign-in. The ENS name owner is the API signer, so it is not the human.
+- `users.world_wallet` is the World App wallet from a verified SIWE link. Pushes are addressed to that wallet. `GET /auth/world/step-up` remains the only approve and deny path.
+- The phone UI is `/mini` on `apps/web`, the same host as `WORLD_REDIRECT_URI`. `apps/world-miniapp` stays empty so a second host does not create a second World `sub`.
+- A missing `WORLD_APP_ID`, a missing notification key, or no linked wallet skips the push. The approval still opens.
+
 ## How to change a decision
 
 Add a new dated section that names what it supersedes. Leave the old section in place and mark it superseded.

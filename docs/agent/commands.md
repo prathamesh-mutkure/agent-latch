@@ -84,6 +84,21 @@ bun run db:migrate
 
 `infra:reset` deletes the Postgres volume, starts it again, and migrates. Starting the API also migrates, so `db:migrate` is only needed when you want to apply SQL without booting the API.
 
+## World App
+
+The API stays on port 3001. World redirects the browser to `WORLD_REDIRECT_URI`, which is `https://app.agentlatch.test:5173/auth/world/callback` locally. Vite proxies `/auth` to the API. A phone cannot open that name.
+
+For a phone, one public HTTPS host must serve the web app and proxy `/auth` and `/api` to the API. Set `WORLD_REDIRECT_URI` to `https://<that-host>/auth/world/callback` and register that exact URI. Set the Developer Portal mini app URL to `https://<that-host>`. Add `WORLD_APP_ID` and `WORLD_NOTIFICATION_API_KEY`, and enable notifications for the mini app.
+
+`apps/web/vercel.json` only falls back to the SPA. Put these rewrites above that fallback, with the real API origin:
+
+```json
+{ "source": "/auth/(.*)", "destination": "https://<api-host>/auth/$1" },
+{ "source": "/api/(.*)", "destination": "https://<api-host>/$1" }
+```
+
+On that host, sign in with World ID, open `/mini`, link World App, allow notifications, and claim `trader`. The background agent then pushes on each tick. Raise `AGENT_INTERVAL_MS` if the phone should not get a push every 10 seconds.
+
 ## Checks
 
 ```sh

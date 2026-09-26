@@ -11,7 +11,7 @@ import {
   type StepUpDecision,
   type WorldIdentity,
 } from "@agentlatch/world";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import type { Db, Tx } from "../../db/client";
 import { db } from "../../db/client";
 import { saveExecution } from "../../executor";
@@ -79,6 +79,23 @@ export async function listApprovals(): Promise<ApprovalRequest[]> {
       .from(approvals)
       .orderBy(asc(approvals.createdAt));
     return rows.map(toApproval);
+  });
+}
+
+/** Pending approvals for the signed-in owner. The agent still polls the open list. */
+export async function listOwnerApprovals(
+  userId: string,
+): Promise<ApprovalRequest[]> {
+  const now = new Date();
+  return db.transaction(async (tx) => {
+    await expireDue(tx, now);
+    const rows = await tx
+      .select({ approval: approvals })
+      .from(approvals)
+      .innerJoin(agents, eq(approvals.agentId, agents.id))
+      .where(and(eq(agents.userId, userId), eq(approvals.status, "PENDING")))
+      .orderBy(asc(approvals.createdAt));
+    return rows.map((row) => toApproval(row.approval));
   });
 }
 

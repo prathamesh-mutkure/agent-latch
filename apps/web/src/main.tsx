@@ -14,6 +14,7 @@ import { AgentPage } from "./pages/agent";
 import { AgentsPage } from "./pages/agents";
 import { ApprovalsPage } from "./pages/approvals";
 import { ApprovePage } from "./pages/approve";
+import { MiniPage } from "./pages/mini";
 import { OverviewPage } from "./pages/overview";
 import { PaymentsPage } from "./pages/payments";
 import { PoliciesPage } from "./pages/policies";
@@ -74,6 +75,12 @@ const paymentsRoute = createRoute({
   component: PaymentsPage,
 });
 
+const miniRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/mini",
+  component: MiniPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   agentsRoute,
@@ -83,6 +90,7 @@ const routeTree = rootRoute.addChildren([
   approvalsRoute,
   approveRoute,
   paymentsRoute,
+  miniRoute,
 ]);
 
 const router = createRouter({

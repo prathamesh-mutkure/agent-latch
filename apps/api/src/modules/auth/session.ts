@@ -4,6 +4,7 @@ import { Elysia } from "elysia";
 
 export const SESSION_COOKIE = "al_session";
 export const ATTEMPT_COOKIE = "al_world_attempt";
+export const SIWE_COOKIE = "al_siwe";
 
 export const SESSION_TTL_S = 7 * 24 * 60 * 60;
 export const ATTEMPT_TTL_S = 10 * 60;

@@ -13,7 +13,8 @@ export default defineConfig({
     port: 5173,
     host: "127.0.0.1",
     strictPort: true,
-    allowedHosts: ["app.agentlatch.test"],
+    // A tunnel or the public deploy host must be able to open this dev server.
+    allowedHosts: true,
     // Same origin for the page, the API, and the World callback, so the
     // session cookie stays first-party.
     proxy: {
