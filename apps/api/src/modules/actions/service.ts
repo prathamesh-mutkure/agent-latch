@@ -7,36 +7,51 @@ import {
   USDC_SEPOLIA_ADDRESS,
   UsdcAmountError,
 } from "@agentlatch/core";
+import { and, asc, eq, gte } from "drizzle-orm";
+import { db } from "../../db/client";
 import { saveExecution } from "../../executor";
-import { memory } from "../../memory";
 import type { Failure, Success } from "../../result";
+import { getAgent, getPolicy } from "../agents/service";
 import { openApproval } from "../approvals/service";
+import { recordAudit } from "../audit/service";
+import { toAction } from "./dto";
+import { actions, executions } from "./schema";
 
-export function listActions(
+export async function listActions(
   agentId: string,
-): Success<ActionRequest[]> | Failure {
-  if (!memory.agents.has(agentId)) {
+): Promise<Success<ActionRequest[]> | Failure> {
+  if (!(await getAgent(agentId))) {
     return { ok: false, status: 404, error: "Agent not found." };
   }
-  return {
-    ok: true,
-    value: memory.actions.filter((action) => action.agentId === agentId),
-  };
+  const rows = await db
+    .select()
+    .from(actions)
+    .where(eq(actions.agentId, agentId))
+    .orderBy(asc(actions.createdAt));
+  return { ok: true, value: rows.map(toAction) };
 }
 
-export function getAction(actionId: string): ActionRequest | undefined {
-  return memory.actions.find((action) => action.id === actionId);
+export async function getAction(
+  actionId: string,
+): Promise<ActionRequest | undefined> {
+  const rows = await db
+    .select()
+    .from(actions)
+    .where(eq(actions.id, actionId))
+    .limit(1);
+  const row = rows[0];
+  return row ? toAction(row) : undefined;
 }
 
-export function submitAction(input: {
+export async function submitAction(input: {
   agentId: string;
   action: ActionType;
   target: string;
   amount: string;
   token?: string;
   note?: string;
-}): Success<ActionRequest> | Failure {
-  if (!memory.agents.has(input.agentId)) {
+}): Promise<Success<ActionRequest> | Failure> {
+  if (!(await getAgent(input.agentId))) {
     return { ok: false, status: 404, error: "Agent not found." };
   }
 
@@ -53,12 +68,12 @@ export function submitAction(input: {
   const now = new Date();
   const token = (input.token ?? USDC_SEPOLIA_ADDRESS).toLowerCase();
   const decision = evaluatePolicy({
-    policy: memory.policies.get(input.agentId),
+    policy: await getPolicy(input.agentId),
     action: input.action,
     target: input.target,
     token,
     amount,
-    spentToday: spentToday(input.agentId, now),
+    spentToday: await spentToday(input.agentId, now),
   });
 
   const id = crypto.randomUUID();
@@ -79,39 +94,75 @@ export function submitAction(input: {
     createdAt: now.toISOString(),
   };
 
-  if (decision.decision === "ALLOW") {
-    const execution = saveExecution(action.id, now);
-    action.status = "EXECUTED";
-    action.executionId = execution.id;
-  } else if (decision.decision === "HUMAN_APPROVAL") {
-    const approval = openApproval(action, decision.reasons, now);
-    action.status = "AWAITING_APPROVAL";
-    action.approvalRequestId = approval.id;
-  }
+  await db.transaction(async (tx) => {
+    await tx.insert(actions).values({
+      id: action.id,
+      agentId: action.agentId,
+      action: action.action,
+      target: action.target,
+      token: action.token,
+      amount: action.amount,
+      nonce: action.nonce,
+      note: action.note,
+      status: "BLOCKED",
+      decision: action.decision,
+      reasons: action.reasons,
+      approvalRequestId: null,
+      executionId: null,
+      createdAt: now,
+    });
 
-  memory.actions.push(action);
+    if (decision.decision === "ALLOW") {
+      const execution = await saveExecution(tx, action.id, now);
+      action.status = "EXECUTED";
+      action.executionId = execution.id;
+      await tx
+        .update(actions)
+        .set({ status: "EXECUTED", executionId: execution.id })
+        .where(eq(actions.id, action.id));
+    } else if (decision.decision === "HUMAN_APPROVAL") {
+      const approval = await openApproval(tx, action, decision.reasons, now);
+      action.status = "AWAITING_APPROVAL";
+      action.approvalRequestId = approval.id;
+      await tx
+        .update(actions)
+        .set({
+          status: "AWAITING_APPROVAL",
+          approvalRequestId: approval.id,
+        })
+        .where(eq(actions.id, action.id));
+    }
+
+    await recordAudit(tx, {
+      agentId: action.agentId,
+      actionRequestId: action.id,
+      approvalId: action.approvalRequestId,
+      kind: decision.decision,
+      summary: action.reasons[0] ?? decision.decision,
+      createdAt: now,
+    });
+  });
+
   console.log(
     `${action.agentId} ${action.action} ${formatUsdc(action.amount)} USDC -> ${action.decision}`,
   );
   return { ok: true, value: action };
 }
 
-function spentToday(agentId: string, now: Date): bigint {
-  const day = now.toISOString().slice(0, 10);
-  let total = 0n;
-  for (const action of memory.actions) {
-    if (
-      action.agentId !== agentId ||
-      action.status !== "EXECUTED" ||
-      !action.executionId
-    ) {
-      continue;
-    }
-    const execution = memory.executions.get(action.executionId);
-    if (!execution || execution.executedAt.slice(0, 10) !== day) {
-      continue;
-    }
-    total += BigInt(action.amount);
-  }
-  return total;
+async function spentToday(agentId: string, now: Date): Promise<bigint> {
+  const start = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+  const rows = await db
+    .select({ amount: actions.amount })
+    .from(actions)
+    .innerJoin(executions, eq(actions.executionId, executions.id))
+    .where(
+      and(
+        eq(actions.agentId, agentId),
+        eq(actions.status, "EXECUTED"),
+        gte(executions.executedAt, start),
+      ),
+    );
+  return rows.reduce((total, row) => total + BigInt(row.amount), 0n);
 }

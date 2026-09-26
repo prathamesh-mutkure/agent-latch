@@ -9,6 +9,8 @@ Product direction lives in [`docs/agent/planning.md`](docs/agent/planning.md). W
 ```sh
 bun install
 cp .env.example .env
+bun run infra:up
+bun run db:migrate
 bun run dev
 ```
 
@@ -16,7 +18,7 @@ bun run dev
 - API health: http://localhost:3001/health
 - Agent process stays idle until Phase 3
 
-The API keeps agents, policies, and approvals in memory. `PUT /agents/:id/policy` sets USDC limits. `POST /agents/:id/actions` returns allow, block, or an approval id. Approve or reject at `POST /approvals/:id/approve` and `POST /approvals/:id/reject`. Field details are in `docs/agent/current-state.md`.
+The API stores agents, policies, actions, approvals, and an audit log in Postgres. `PUT /agents/:id/policy` sets USDC limits. `POST /agents/:id/actions` returns allow, block, or an approval id. Approve or reject at `POST /approvals/:id/approve` and `POST /approvals/:id/reject`. The timeline is `GET /agents/:id/audit`. Field details are in `docs/agent/current-state.md`.
 
 ```sh
 bun run typecheck

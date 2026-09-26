@@ -6,11 +6,11 @@ import { approvalIdParams } from "./schemas";
 import { getApproval, listApprovals, resolveApproval } from "./service";
 
 export const approvalRoutes = new Elysia({ prefix: "/approvals" })
-  .get("/", () => listApprovals().map(toApprovalDto))
+  .get("/", async () => (await listApprovals()).map(toApprovalDto))
   .get(
     "/:approvalId",
-    ({ params, set }) => {
-      const approval = getApproval(params.approvalId);
+    async ({ params, set }) => {
+      const approval = await getApproval(params.approvalId);
       if (!approval) {
         set.status = 404;
         return { error: "Approval not found." };
@@ -21,28 +21,28 @@ export const approvalRoutes = new Elysia({ prefix: "/approvals" })
   )
   .post(
     "/:approvalId/approve",
-    ({ params, set }) => {
-      const result = resolveApproval(params.approvalId, "approve");
+    async ({ params, set }) => {
+      const result = await resolveApproval(params.approvalId, "approve");
       if (!result.ok) {
         return respond(set, result);
       }
       return {
         approval: toApprovalDto(result.value.approval),
-        action: toActionDto(result.value.action),
+        action: await toActionDto(result.value.action),
       };
     },
     { params: approvalIdParams },
   )
   .post(
     "/:approvalId/reject",
-    ({ params, set }) => {
-      const result = resolveApproval(params.approvalId, "reject");
+    async ({ params, set }) => {
+      const result = await resolveApproval(params.approvalId, "reject");
       if (!result.ok) {
         return respond(set, result);
       }
       return {
         approval: toApprovalDto(result.value.approval),
-        action: toActionDto(result.value.action),
+        action: await toActionDto(result.value.action),
       };
     },
     { params: approvalIdParams },

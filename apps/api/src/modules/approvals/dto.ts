@@ -4,6 +4,36 @@ import type {
   ApprovalStatus,
 } from "@agentlatch/core";
 import { formatUsdc } from "@agentlatch/core";
+import type { approvals } from "./schema";
+
+type ApprovalRow = typeof approvals.$inferSelect;
+
+export function toApproval(row: ApprovalRow): ApprovalRequest {
+  const expiresAt = row.expiresAt.toISOString();
+  return {
+    id: row.id,
+    agentId: row.agentId,
+    actionRequestId: row.actionRequestId,
+    action: row.action as ActionType,
+    amount: row.amount,
+    token: row.token,
+    target: row.target,
+    reason: row.reason,
+    status: row.status as ApprovalStatus,
+    expiresAt,
+    createdAt: row.createdAt.toISOString(),
+    nonce: row.nonce,
+    authorization: {
+      agentId: row.agentId,
+      action: row.action as ActionType,
+      target: row.target,
+      token: row.token,
+      amount: row.amount,
+      nonce: row.nonce,
+      expiresAt,
+    },
+  };
+}
 
 export type AuthorizationDto = {
   agentId: string;

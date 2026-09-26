@@ -61,6 +61,21 @@ Signing is a third axis, next to policy and executors. Policy decides whether an
 - `AlchemySmartAccountSigner` is an optional extension, not the default and not Phase 2. It submits an ERC-4337 user operation through Alchemy Account Kit. The smart account address is the agent wallet. The owner key can still be the same demo key. Alchemy does not replace authorization.
 - Owner login, when it exists, is a separate wallet. Do not use the agent signer for the dashboard session.
 
+## 2026-09-26 — Database
+
+- Postgres runs from Docker Compose. SQL migrations are `db/migrations`. Schema path superseded the same day by "Schema location" below.
+- Tables are agents, policies, actions, executions, approvals, and audit_events.
+- `users`, `capabilities`, and `payments` stay out until those features exist.
+- The API does not keep an in-memory store.
+
+## 2026-09-26 — Schema location
+
+Supersedes the schema path in "Database".
+
+- Each API module owns its Drizzle tables in `schema.ts`. Row-to-domain mapping lives in that module's `dto.ts`.
+- `apps/api/src/db/schema.ts` only re-exports the tables for the client and drizzle-kit.
+- SQL migrations stay in `db/migrations`.
+
 ## How to change a decision
 
 Add a new dated section that names what it supersedes. Leave the old section in place and mark it superseded.

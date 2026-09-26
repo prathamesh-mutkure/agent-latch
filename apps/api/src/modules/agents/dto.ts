@@ -1,5 +1,30 @@
-import type { ActionType, Policy } from "@agentlatch/core";
+import type { ActionType, Agent, Policy } from "@agentlatch/core";
 import { formatUsdc } from "@agentlatch/core";
+import type { agents, policies } from "./schema";
+
+type AgentRow = typeof agents.$inferSelect;
+type PolicyRow = typeof policies.$inferSelect;
+
+export function toAgent(row: AgentRow): Agent {
+  return {
+    id: row.id,
+    name: row.name,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+export function toPolicy(row: PolicyRow): Policy {
+  return {
+    agentId: row.agentId,
+    autonomousLimit: row.autonomousLimit,
+    hardLimit: row.hardLimit,
+    dailyLimit: row.dailyLimit,
+    allowedActions: row.allowedActions as ActionType[],
+    allowedTokens: row.allowedTokens,
+    allowedTargets: row.allowedTargets,
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
 
 export type PolicyDto = {
   agentId: string;

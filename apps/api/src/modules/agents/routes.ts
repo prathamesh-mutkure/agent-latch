@@ -11,14 +11,14 @@ import {
 } from "./service";
 
 export const agentsRoutes = new Elysia({ prefix: "/agents" })
-  .post("/", ({ body }) => createAgent(body.name), {
+  .post("/", async ({ body }) => createAgent(body.name), {
     body: createAgentBody,
   })
-  .get("/", () => listAgents())
+  .get("/", async () => listAgents())
   .get(
     "/:agentId",
-    ({ params, set }) => {
-      const agent = getAgent(params.agentId);
+    async ({ params, set }) => {
+      const agent = await getAgent(params.agentId);
       if (!agent) {
         set.status = 404;
         return { error: "Agent not found." };
@@ -29,8 +29,8 @@ export const agentsRoutes = new Elysia({ prefix: "/agents" })
   )
   .put(
     "/:agentId/policy",
-    ({ params, body, set }) => {
-      const result = setPolicy(params.agentId, body);
+    async ({ params, body, set }) => {
+      const result = await setPolicy(params.agentId, body);
       if (!result.ok) {
         return respond(set, result);
       }
@@ -43,12 +43,12 @@ export const agentsRoutes = new Elysia({ prefix: "/agents" })
   )
   .get(
     "/:agentId/policy",
-    ({ params, set }) => {
-      if (!getAgent(params.agentId)) {
+    async ({ params, set }) => {
+      if (!(await getAgent(params.agentId))) {
         set.status = 404;
         return { error: "Agent not found." };
       }
-      const policy = getPolicy(params.agentId);
+      const policy = await getPolicy(params.agentId);
       if (!policy) {
         set.status = 404;
         return { error: "Policy not found." };

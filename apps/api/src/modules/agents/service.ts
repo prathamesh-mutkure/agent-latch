@@ -2,37 +2,68 @@ import {
   type ActionType,
   type Agent,
   actionTypes,
+  formatUsdc,
   type Policy,
   parseUsdc,
   USDC_SEPOLIA_ADDRESS,
   UsdcAmountError,
 } from "@agentlatch/core";
-import { memory } from "../../memory";
+import { eq } from "drizzle-orm";
+import { db } from "../../db/client";
 import type { Failure, Success } from "../../result";
+import { recordAudit } from "../audit/service";
+import { toAgent, toPolicy } from "./dto";
+import { agents, policies } from "./schema";
 
-export function createAgent(name: string): Agent {
+export async function createAgent(name: string): Promise<Agent> {
   const agent: Agent = {
     id: crypto.randomUUID(),
     name: name.trim(),
     createdAt: new Date().toISOString(),
   };
-  memory.agents.set(agent.id, agent);
+  const createdAt = new Date(agent.createdAt);
+  await db.transaction(async (tx) => {
+    await tx.insert(agents).values({
+      id: agent.id,
+      name: agent.name,
+      createdAt,
+    });
+    await recordAudit(tx, {
+      agentId: agent.id,
+      kind: "AGENT_CREATED",
+      summary: `Created agent ${agent.name}.`,
+      createdAt,
+    });
+  });
   return agent;
 }
 
-export function listAgents(): Agent[] {
-  return [...memory.agents.values()];
+export async function listAgents(): Promise<Agent[]> {
+  const rows = await db.select().from(agents).orderBy(agents.createdAt);
+  return rows.map(toAgent);
 }
 
-export function getAgent(agentId: string): Agent | undefined {
-  return memory.agents.get(agentId);
+export async function getAgent(agentId: string): Promise<Agent | undefined> {
+  const rows = await db
+    .select()
+    .from(agents)
+    .where(eq(agents.id, agentId))
+    .limit(1);
+  const row = rows[0];
+  return row ? toAgent(row) : undefined;
 }
 
-export function getPolicy(agentId: string): Policy | undefined {
-  return memory.policies.get(agentId);
+export async function getPolicy(agentId: string): Promise<Policy | undefined> {
+  const rows = await db
+    .select()
+    .from(policies)
+    .where(eq(policies.agentId, agentId))
+    .limit(1);
+  const row = rows[0];
+  return row ? toPolicy(row) : undefined;
 }
 
-export function setPolicy(
+export async function setPolicy(
   agentId: string,
   input: {
     autonomousLimit: string;
@@ -41,8 +72,8 @@ export function setPolicy(
     allowedActions?: ActionType[];
     allowedTargets?: string[];
   },
-): Success<Policy> | Failure {
-  if (!memory.agents.has(agentId)) {
+): Promise<Success<Policy> | Failure> {
+  if (!(await getAgent(agentId))) {
     return { ok: false, status: 404, error: "Agent not found." };
   }
 
@@ -88,6 +119,7 @@ export function setPolicy(
     };
   }
 
+  const updatedAt = new Date();
   const policy: Policy = {
     agentId,
     autonomousLimit: autonomous.toString(),
@@ -96,8 +128,41 @@ export function setPolicy(
     allowedActions,
     allowedTokens: [USDC_SEPOLIA_ADDRESS.toLowerCase()],
     allowedTargets: (input.allowedTargets ?? []).map((target) => target.trim()),
-    updatedAt: new Date().toISOString(),
+    updatedAt: updatedAt.toISOString(),
   };
-  memory.policies.set(agentId, policy);
+
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(policies)
+      .values({
+        agentId,
+        autonomousLimit: policy.autonomousLimit,
+        hardLimit: policy.hardLimit,
+        dailyLimit: policy.dailyLimit,
+        allowedActions: policy.allowedActions,
+        allowedTokens: policy.allowedTokens,
+        allowedTargets: policy.allowedTargets,
+        updatedAt,
+      })
+      .onConflictDoUpdate({
+        target: policies.agentId,
+        set: {
+          autonomousLimit: policy.autonomousLimit,
+          hardLimit: policy.hardLimit,
+          dailyLimit: policy.dailyLimit,
+          allowedActions: policy.allowedActions,
+          allowedTokens: policy.allowedTokens,
+          allowedTargets: policy.allowedTargets,
+          updatedAt,
+        },
+      });
+    await recordAudit(tx, {
+      agentId,
+      kind: "POLICY_SET",
+      summary: `Policy set. Autonomous limit ${formatUsdc(policy.autonomousLimit)} USDC, hard limit ${formatUsdc(policy.hardLimit)} USDC.`,
+      createdAt: updatedAt,
+    });
+  });
+
   return { ok: true, value: policy };
 }

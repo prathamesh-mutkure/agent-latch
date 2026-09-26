@@ -7,8 +7,8 @@ import { getAction, listActions, submitAction } from "./service";
 export const actionRoutes = new Elysia()
   .post(
     "/agents/:agentId/actions",
-    ({ params, body, set }) => {
-      const result = submitAction({
+    async ({ params, body, set }) => {
+      const result = await submitAction({
         agentId: params.agentId,
         action: body.action,
         target: body.target,
@@ -28,19 +28,19 @@ export const actionRoutes = new Elysia()
   )
   .get(
     "/agents/:agentId/actions",
-    ({ params, set }) => {
-      const result = listActions(params.agentId);
+    async ({ params, set }) => {
+      const result = await listActions(params.agentId);
       if (!result.ok) {
         return respond(set, result);
       }
-      return result.value.map(toActionDto);
+      return Promise.all(result.value.map((action) => toActionDto(action)));
     },
     { params: agentIdParams },
   )
   .get(
     "/actions/:actionId",
-    ({ params, set }) => {
-      const action = getAction(params.actionId);
+    async ({ params, set }) => {
+      const action = await getAction(params.actionId);
       if (!action) {
         set.status = 404;
         return { error: "Action not found." };

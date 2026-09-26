@@ -1,12 +1,12 @@
 # Current state
 
-**Phase:** 1 complete. Next is Phase 2.
+**Phase:** 2 complete. Next is Phase 3.
 **Updated:** 2026-09-26
 
 ## What runs
 
 - `packages/core` — `ActionRequest`, `Policy`, `PolicyDecision`, `ApprovalRequest`. `evaluatePolicy` is pure and does not create approval ids. Amounts are USDC base units.
-- `apps/api` — in-memory control plane, split into `modules/{agents,actions,approvals,health}`. Zod validates requests. `to*Dto` shapes responses. Restarting the API clears the store.
+- `apps/api` — Postgres control plane via Drizzle, split into `modules/{agents,actions,approvals,audit,health}`. Zod validates requests. `to*Dto` shapes responses. Data survives an API restart.
 - Allowed actions execute through a simulated executor. `signed` is always false. No key is read. The future signer is a separate module from executors. See `packages/signers/`.
 - `apps/web` — home page only. It does not call the API yet.
 - `apps/agent` — still idle. It does not submit actions until Phase 3.
@@ -21,7 +21,7 @@ Demo policy: autonomous 500 USDC, hard limit 5000 USDC. 100 allows, 600 waits fo
 
 | Path | Phase |
 | --- | --- |
-| `db/schema`, `db/migrations`, `db/seed` | 2 |
+| `db/seed` | optional local seed, unused |
 | `packages/executors/api` | 3 |
 | `packages/integrations/ens`, `contracts/` | 4 |
 | `packages/integrations/world` | 5 |
@@ -33,7 +33,7 @@ Demo policy: autonomous 500 USDC, hard limit 5000 USDC. 100 allows, 600 waits fo
 | `packages/signers/alchemy` | later extension, not the default |
 | `packages/sdk`, `packages/contracts` | later |
 
-Postgres is not running. No Docker, no contracts, no sponsor SDKs.
+Local Postgres is `bun run infra:up`, then `bun run db:migrate`. `infra:down` stops it. `infra:reset` drops the volume and migrates again. No contracts and no sponsor SDKs. `GET /agents/:agentId/audit` is the timeline. `GET /health` reports whether the database is up.
 
 ## API
 
@@ -45,10 +45,10 @@ Amounts are USDC strings (`"100"`, `"1.5"`). The token is Sepolia USDC unless an
 - `POST /approvals/:approvalId/approve`
 - `POST /approvals/:approvalId/reject`
 
-List routes: `GET /agents`, `GET /agents/:agentId`, `GET /agents/:agentId/policy`, `GET /agents/:agentId/actions`, `GET /actions/:actionId`, `GET /approvals`, `GET /approvals/:approvalId`.
+List routes: `GET /agents`, `GET /agents/:agentId`, `GET /agents/:agentId/policy`, `GET /agents/:agentId/actions`, `GET /agents/:agentId/audit`, `GET /actions/:actionId`, `GET /approvals`, `GET /approvals/:approvalId`.
 
 Daily limit is optional and must be at least the autonomous limit. Pending approvals expire after 15 minutes. No login.
 
-## Phase 2 next
+## Phase 3 next
 
-PostgreSQL and Drizzle for agents, policies, actions, approvals, and an audit log. Do not add sponsors, the signer, or the background agent.
+Background agent. It should notice a mocked condition, submit an `ActionRequest`, and keep running when the dashboard is closed. Leave the signer and sponsor integrations alone.

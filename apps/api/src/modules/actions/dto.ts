@@ -7,6 +7,28 @@ import type {
 } from "@agentlatch/core";
 import { formatUsdc } from "@agentlatch/core";
 import { getExecution } from "../../executor";
+import type { actions } from "./schema";
+
+type ActionRow = typeof actions.$inferSelect;
+
+export function toAction(row: ActionRow): ActionRequest {
+  return {
+    id: row.id,
+    agentId: row.agentId,
+    action: row.action as ActionType,
+    target: row.target,
+    token: row.token,
+    amount: row.amount,
+    nonce: row.nonce,
+    note: row.note,
+    status: row.status as ActionStatus,
+    decision: row.decision as Decision,
+    reasons: row.reasons,
+    approvalRequestId: row.approvalRequestId,
+    executionId: row.executionId,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
 
 export type ActionDto = {
   id: string;
@@ -26,7 +48,7 @@ export type ActionDto = {
   createdAt: string;
 };
 
-export function toActionDto(action: ActionRequest): ActionDto {
+export async function toActionDto(action: ActionRequest): Promise<ActionDto> {
   return {
     id: action.id,
     agentId: action.agentId,
@@ -42,7 +64,7 @@ export function toActionDto(action: ActionRequest): ActionDto {
     reasons: action.reasons,
     approvalRequestId: action.approvalRequestId,
     execution: action.executionId
-      ? (getExecution(action.executionId) ?? null)
+      ? ((await getExecution(action.executionId)) ?? null)
       : null,
     createdAt: action.createdAt,
   };
