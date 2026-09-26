@@ -27,11 +27,48 @@ export function payTo(): `0x${string}` {
   return DEMO_PAYEE;
 }
 
-function facilitatorUrl(): string {
-  return (
-    process.env.FACILITATOR_URL ??
-    `http://localhost:${process.env.PORT ?? 3001}/facilitator`
-  );
+function listeningPort(): string {
+  return process.env.PORT ?? "3001";
+}
+
+/** Where this process settles. A copied localhost:3001 URL is ignored when PORT differs. */
+function selfFacilitatorUrl(): string {
+  const port = listeningPort();
+  const configured = process.env.FACILITATOR_URL?.trim();
+  if (configured) {
+    try {
+      const parsed = new URL(configured);
+      const loopback =
+        parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+      if (!loopback) {
+        return configured.replace(/\/$/, "");
+      }
+      if (!parsed.port || parsed.port === port) {
+        return `http://127.0.0.1:${parsed.port || port}/facilitator`;
+      }
+    } catch {
+      // A bad FACILITATOR_URL falls through to this process.
+    }
+  }
+  return `http://127.0.0.1:${port}/facilitator`;
+}
+
+/** URL clients see. A loopback FACILITATOR_URL is this API's public origin. */
+function publishedFacilitatorUrl(origin: string): string {
+  const configured = process.env.FACILITATOR_URL?.trim();
+  if (configured) {
+    try {
+      const parsed = new URL(configured);
+      const loopback =
+        parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+      if (!loopback) {
+        return configured.replace(/\/$/, "");
+      }
+    } catch {
+      // fall through
+    }
+  }
+  return `${origin}/facilitator`;
 }
 
 async function callFacilitator<T>(
@@ -39,7 +76,7 @@ async function callFacilitator<T>(
   body: FacilitatorRequest,
 ): Promise<T | undefined> {
   try {
-    const response = await fetch(`${facilitatorUrl()}/${path}`, {
+    const response = await fetch(`${selfFacilitatorUrl()}/${path}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
@@ -96,7 +133,7 @@ function merchant(
     asset: requirement.asset,
     payTo: requirement.payTo,
     amountBaseUnits: requirement.amount,
-    facilitator: facilitatorUrl(),
+    facilitator: publishedFacilitatorUrl(origin),
   };
 }
 

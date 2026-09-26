@@ -220,7 +220,7 @@ Supersedes "World ID for Agents", "Deny needs World ID too", "World App notifica
 - Push only when an action opens an approval. Allow and block do not push. The push is fire and forget, goes to the owner's wallet through `developer.world.org/api/v2/minikit/send-notification`, and opens `/approve/:id` in the mini app. Unverified mini apps get 40 pushes per 4 hours.
 - Decide: `GET /approvals/:id/challenge?decision=approve|deny` returns what World App signs. `nonce = sha256(binding_hash | decision)`, request ID = approval ID, expiry = approval expiry, and the one-line statement names the verb, action, amount, and agent. `POST /approvals/:id/decide` verifies the signature before the row lock and requires the owner's wallet. Under the lock it rechecks pending, an unchanged owner, and stored = recomputed `binding_hash` (else `FAILED: BINDING`). Deny sets `REJECTED`. Approve runs the ENS passport check and the existing settle path. `decided_by` and `decided_at` record the wallet and time. A bad or foreign signature is 400 or 403 and changes nothing.
 - No route changes an approval without the owner's World App signature. Agent-facing reads (`GET /approvals`, `GET /approvals/:id`) stay open.
-- The browser reaches the API only by `fetch` through `/api` with `ngrok-skip-browser-warning`. Nothing navigates to the API, so the ngrok interstitial is out of the flow.
+- The browser reaches the API only by `fetch` through `/api`. Nothing navigates to the API. The `ngrok-skip-browser-warning` header was removed once the tunnel was gone (see "The public API is one Render process").
 - The desktop dashboard does not decide. It links into World App with `MiniKit.getMiniAppUrl`. `/mini` and `/approve/:id` act only inside World App.
 - Kept: the `binding_hash` formula, 5-minute approvals, the passport check before execution, and `FAILED` reasons `BINDING`, `PASSPORT_INACTIVE`, and `PAYMENT_FAILED`. Gone: `WRONG_HUMAN`, `STALE_VERIFICATION`, `WEAK_PROOF`, and `CANCELLED` from the World screen.
 - Tradeoff: a decision proves the wallet, not personhood. The event's World prizes need IDKit or World ID for Agents. See "World ID proof on approve" in `open-questions.md`.
@@ -333,6 +333,15 @@ Supersedes "For now it lists AgentLatch's own demo seller" in "MCP server for x4
 - `GET /x402/merchants` lists the 0.01 USDC demo seller and six more from `apps/api/src/modules/x402/merchants.ts`, each at `/x402/shop/<id>`: Omikuji 0.1 (a Japanese shrine fortune), Purr 0.2 (cat fact and ASCII cat), Blob 0.3 (kawaii SVG sticker), Pixel 0.4 (8-bit sprite grid), Lookout 0.5 (live Sepolia block and gas), Oracle 0.6 (snapshot plus fortune, a go or wait call). All pay `X402_PAY_TO` through AgentLatch's facilitator, so nothing about settlement changes.
 - A seller answers `{ paid, txHash, item }`. If the item fails after settlement, it still returns the receipt with `item: null`.
 - `payQuote` keeps the seller's response. It is stored as `actions.result` (jsonb, migration 0008, cut at 16 KB) on a direct payment and after a World approval, and returned by action reads and the MCP payment tools. Under the 0.2 / 1 / 5 demo policy, Omikuji and Purr pay at once and the 0.3 to 0.6 merchants wait for World approval. Before this the body was dropped, so an agent paid and never saw what it bought.
+
+## 2026-09-27 — The public API is one Render process
+
+Supersedes the ngrok fetch header in "World App is the only human surface".
+
+- Live: the web app is Vercel at `https://www.dsapprotocol.xyz`. The API is one Bun process at `https://dsap-protocol.onrender.com`. Postgres is Neon. `apps/web/vercel.json` rewrites `/api` to that host and strips the prefix. World App never calls the API.
+- Render Free sleeps after 15 minutes with no requests. A ping every 5 minutes keeps this instance awake. Sign-in nonces and QR codes still live in the one process, so a restart drops a sign-in in progress.
+- The ngrok tunnel is gone. Browser fetches do not send `ngrok-skip-browser-warning`.
+- `apps/mcp` stays stdio on the demo machine. Do not deploy it as a public HTTP service.
 
 ## How to change a decision
 

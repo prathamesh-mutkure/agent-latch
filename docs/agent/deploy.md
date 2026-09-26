@@ -1,33 +1,29 @@
 # Deploy the API and Postgres
 
-Nothing here has been run. Postgres is still local Docker, and the live site still reaches a laptop through ngrok.
+Live:
 
-Today:
+- Web: `https://www.dsapprotocol.xyz` on Vercel. `apps/web/vercel.json` rewrites `/api` to `https://dsap-protocol.onrender.com/$1`. World App never calls the API. The phone opens the web app, and the web app calls `/api`.
+- API: `https://dsap-protocol.onrender.com`, one Bun process on Render Free. A ping every 5 minutes keeps it awake. On startup it applies `db/migrations` and logs `migrations applied`.
+- Postgres: Neon. The API reads the direct `DATABASE_URL` (no `-pooler`). Local Docker (`postgres:16`, database `agentlatch`, port 5432, `bun run infra:up`) is the laptop database.
+- `apps/agent` and `apps/mcp` stay on the demo machine. The MCP server is stdio for Claude or Cursor. Do not deploy it.
 
-- Postgres is `docker compose`, image `postgres:16`, database `agentlatch`, user and password `postgres`, port 5432. `bun run infra:up` starts it. There is no hosted database.
-- The API is `apps/api`, Elysia on Bun, port 3001 locally. On startup it applies `db/migrations` and logs `migrations applied`.
-- The web app is already on Vercel at `https://www.dsapprotocol.xyz`. `apps/web/vercel.json` rewrites `/api` to an ngrok host. World App never calls the API. The phone opens the web app, and the web app calls `/api`.
-- `apps/agent` and `apps/mcp` are separate processes. The MCP server is stdio for Claude or Cursor.
-
-This replaces the tunnel with a hosted Postgres 16 and one public HTTPS API process. Bun runs the API directly. There is no Docker image.
+The web app stays on Vercel. Vercel runs Elysia as a function: Hobby invocations stop at 300 seconds, and a new invocation does not keep the previous process. Sign-in nonces, QR pairing codes, and the World ID poller live in the API process. Render runs `bun src/index.ts`, which is what `apps/api` already does. There is no Docker image.
 
 ## Hosts
 
-A few hours, on free tiers:
+- **Postgres:** [Neon](https://neon.tech). The live project is already created. A new one should be Postgres **16** (the console defaults to a newer major; the live project is 18 and the copied schema loaded). Free scale-to-zero cannot be turned off: the compute suspends after 5 minutes with no queries. The dashboard polls during a demo, so it stays awake while people are using it.
+- **API:** [Render](https://render.com), Node runtime (Bun is on that runtime). One web service, one instance. Free sleeps after 15 minutes with no requests; this service is kept awake with a ping every 5 minutes.
 
-- **Postgres:** [Neon](https://neon.tech) Free. Create a project and set the Postgres version to **16** (the console defaults to a newer major). The local image is `postgres:16`. Free includes 100 compute-hours a month. Scale-to-zero is on and cannot be turned off: the compute suspends after 5 minutes with no queries. The dashboard polls during a demo, so it stays awake while people are using it. The next request after a quiet gap wakes it; `/health` can say `database: "down"` until that wake finishes. Request it again.
-- **API:** [Railway](https://railway.com) Free. One service, one replica (the plan maximum). Bun runs through Railpack from `packageManager` in the root `package.json`. Leave **Serverless off**. With it on, the process sleeps after 10 minutes without outbound traffic, and that drops a sign-in in progress. Free includes $1 of usage credit a month. A small API for a few hours is a few cents. Stop the service when the demo is over, or a process left on all month uses up the credit and Railway pauses it. A new account also gets a 30-day trial with $5 of credit.
+## Postgres
 
-The web app stays on Vercel. Do not move the API there. Vercel runs Elysia as a function: Hobby invocations stop at 300 seconds, and a new invocation does not keep the previous process. Sign-in nonces, QR pairing codes, and the World ID poller live in that process. Railway runs `bun src/index.ts` as one server, which is what `apps/api` already does.
-
-The MCP server stays on the demo machine. It is stdio for Claude or Cursor. Railway and Vercel do not host it.
-
-Put the Neon project and the Railway service in the same region when both consoles offer it.
+1. In the Neon console, create a project. Prefer Postgres version **16**. Leave the database name Neon assigns.
+2. Neon shows two strings. `DATABASE_URL` is direct. `DATABASE_URL_POOLED` has `-pooler` in the host. On Render, set `DATABASE_URL` to the direct string. Do not set `DATABASE_URL_POOLED`. The API reads only `DATABASE_URL`, and startup runs Drizzle migrations on that same URL.
+3. Keep `sslmode=require`. If the string also has `channel_binding`, delete that parameter. `postgres` forwards unknown URL parameters as server startup options, and `channel_binding` is a client setting.
 
 ## Postgres
 
 1. In the Neon console, create a project. Postgres version **16**. Leave the database name Neon assigns (often `neondb`). The API migrates whichever database `DATABASE_URL` names.
-2. Neon shows two strings. `DATABASE_URL` is direct. `DATABASE_URL_POOLED` has `-pooler` in the host. On Railway, set `DATABASE_URL` to the direct string. Do not set `DATABASE_URL_POOLED`. The API reads only `DATABASE_URL`, and startup runs Drizzle migrations on that same URL. The pooler is the wrong endpoint for that.
+2. Neon shows two strings. `DATABASE_URL` is direct. `DATABASE_URL_POOLED` has `-pooler` in the host. On Render, set `DATABASE_URL` to the direct string. Do not set `DATABASE_URL_POOLED`. The API reads only `DATABASE_URL`, and startup runs Drizzle migrations on that same URL. The pooler is the wrong endpoint for that.
 3. Keep `sslmode=require`. If the string also has `channel_binding`, delete that parameter. `postgres` forwards unknown URL parameters as server startup options, and `channel_binding` is a client setting.
 
 `DATABASE_URL` looks like:
@@ -42,24 +38,24 @@ The local value `postgres://postgres:postgres@localhost:5432/agentlatch` is the 
 
 ## API
 
-One Railway service from this repo. Generate a public domain. The URL looks like `https://<service>.up.railway.app`.
+The live service is `https://dsap-protocol.onrender.com`. To recreate it, one Render web service from this repo:
 
 | Setting | Value |
 | --- | --- |
-| Builder | Railpack |
-| Root directory | repository root |
+| Runtime | Node |
+| Root directory | repository root (empty) |
 | Build command | `bun install` |
 | Start command | `bun --filter @agentlatch/api start` |
-| Replicas | 1 |
-| Serverless | off |
+| Health check path | `/health` |
+| Instances | 1 |
 
-`bun --filter @agentlatch/api start` runs `bun src/index.ts`. The root directory has to be the repo root so the workspace packages install. Railway sets `PORT`; leave it unset. The process applies `db/migrations`, logs `migrations applied`, then listens.
+`bun --filter @agentlatch/api start` runs `bun src/index.ts`. The root directory has to be the repo root so the workspace packages install. Render sets `PORT`; leave it unset. Also set `BUN_VERSION=1.3.8`. The process applies `db/migrations`, logs `migrations applied`, then listens.
 
-The API loads a repo-root `.env` when that file is on disk, and it does not override variables already set. On Railway, set the variables in the service. Do not commit `.env`.
+The API loads a repo-root `.env` when that file is on disk, and it does not override variables already set. On Render, set the variables in the service. Do not commit `.env`. Do not set `PORT` or `FACILITATOR_URL`.
 
 ## Environment
 
-Every name below is in `.env.example`. Secrets stay off the web app and off every `VITE_` variable. Copy them from the local `.env` into the Railway service. `SESSION_SECRET` must stay the same across restarts and deploys. If it changes, or if it is unset, every restart signs everyone out. Generate it once:
+Every name below is in `.env.example`. Secrets stay off the web app and off every `VITE_` variable. Copy them from the local `.env` into the Render service. `SESSION_SECRET` must stay the same across restarts and deploys. If it changes, or if it is unset, every restart signs everyone out. Generate it once:
 
 ```sh
 openssl rand -hex 32
@@ -83,14 +79,14 @@ openssl rand -hex 32
 
 | Variable | If unset |
 | --- | --- |
-| `PORT` | Railway sets it. The code defaults to `3001` only when it is missing, which is the local port. |
+| `PORT` | Render sets it. Leave it unset. The code defaults to `3001` only when it is missing, which is the local port. |
 | `ENS_PARENT_NAME` | `agent-latch.eth` |
 | `SEPOLIA_RPC_URL` | Public node, which rate-limits ENS reads (`Request exceeds defined limit.`). Set a keyed Sepolia URL. |
 | `ENS_REGISTRY_ADDRESS` | Sepolia ETHRegistry. |
 | `WORLDCHAIN_RPC_URL` | Public World Chain endpoint, used for Safe EIP-1271 checks. |
 | `X402_PAY_TO` | Demo signer `0x142B99367b928608835501633534411EFc467737`. Leave unset for that demo. The facilitator settles only to this address. |
 | `FACILITATOR_PRIVATE_KEY` | Falls back to `EXECUTOR_PRIVATE_KEY`. Pays Sepolia gas for the demo seller. |
-| `FACILITATOR_URL` | Leave unset. The seller calls `http://localhost:$PORT/facilitator` on the same Railway process. Railway sets `PORT`. |
+| `FACILITATOR_URL` | Leave unset. The seller calls `http://127.0.0.1:$PORT/facilitator` on the same process. A copied `localhost:3001` value is ignored when `PORT` is different. |
 
 The API does not read `USDC_ADDRESS`, `X402_NETWORK`, `DATABASE_URL_POOLED`, `WORLD_REDIRECT_URI`, or `COOKIE_SECRET`. Circle USDC and `eip155:11155111` are constants in code.
 
@@ -113,15 +109,13 @@ Run a single API process. Sign-in nonces and QR pairing codes live in process me
 
 ## Background agent
 
-Run it on the demo machine so the Railway credit stays on the API. It only calls the API. It does not need `DATABASE_URL` or the World secrets.
+Run it on the demo machine. It only calls the API. It does not need `DATABASE_URL` or the World secrets. The demo does not need `AGENT_KEY`; the agent idles without it.
 
 ```sh
-API_URL=https://<service>.up.railway.app bun --filter @agentlatch/agent start
+API_URL=https://dsap-protocol.onrender.com bun --filter @agentlatch/agent start
 ```
 
-Set `AGENT_ID` and `AGENT_KEY` in the environment first. The key is shown once on the agent's page. Without them the process logs that it is idle and exits. `AGENT_INTERVAL_MS` and `AGENT_POLL_MS` are optional (defaults `10000` and `2000`).
-
-A second Railway service with the same start command also works, and it spends the same $1 credit. One service is enough for a few hours.
+Set `AGENT_ID` and `AGENT_KEY` in the environment first if it should act. The key is shown once on the agent's page. `AGENT_INTERVAL_MS` and `AGENT_POLL_MS` are optional (defaults `10000` and `2000`).
 
 The unverified mini app allows 40 pushes per 4 hours. Raise `AGENT_INTERVAL_MS` for a long session.
 
@@ -138,7 +132,7 @@ Point `API_URL` at the deployed API. Keep `AGENT_ID`, `AGENT_KEY`, `AGENT_PRIVAT
       "command": "bun",
       "args": ["/absolute/path/to/agent-latch/apps/mcp/src/index.ts"],
       "env": {
-        "API_URL": "https://<service>.up.railway.app",
+        "API_URL": "https://dsap-protocol.onrender.com",
         "AGENT_ID": "<agent id>",
         "AGENT_KEY": "<agent key>",
         "AGENT_PRIVATE_KEY": "<agent signing key>",
@@ -151,29 +145,29 @@ Point `API_URL` at the deployed API. Keep `AGENT_ID`, `AGENT_KEY`, `AGENT_PRIVAT
 
 ## Point the web app at the API
 
-After `GET /health` on the Railway URL returns `database: "up"`, change the `/api` rewrite in `apps/web/vercel.json` and redeploy `apps/web`. Leave the SPA rewrite as it is.
+The live rewrite is already set. To point a new API host at the site, change `apps/web/vercel.json` and redeploy `apps/web`. Leave the SPA rewrite as it is.
 
 ```json
 {
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://<service>.up.railway.app/$1"
+      "destination": "https://dsap-protocol.onrender.com/$1"
     },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
 ```
 
-`$1` is the path after `/api`, so `https://www.dsapprotocol.xyz/api/health` hits `https://<service>.up.railway.app/health`.
+`$1` is the path after `/api`, so `https://www.dsapprotocol.xyz/api/health` hits `https://dsap-protocol.onrender.com/health`.
 
 The Developer Portal mini app URL is already `https://www.dsapprotocol.xyz`. Change it only if the web host changes.
 
 ## Smoke check
 
 ```sh
-curl -sS "https://<service>.up.railway.app/health"
-curl -sS "https://<service>.up.railway.app/world/config"
+curl -sS "https://dsap-protocol.onrender.com/health"
+curl -sS "https://dsap-protocol.onrender.com/world/config"
 curl -sS "https://www.dsapprotocol.xyz/api/health"
 curl -sS "https://www.dsapprotocol.xyz/api/world/config"
 ```

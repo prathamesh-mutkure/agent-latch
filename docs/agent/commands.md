@@ -122,14 +122,14 @@ World App must open the web app on a public HTTPS host, and that host proxies `/
 { "source": "/api/(.*)", "destination": "https://<api-host>/$1" }
 ```
 
-For a local API behind ngrok:
+Live, that host is `https://dsap-protocol.onrender.com`. See [`deploy.md`](deploy.md).
+
+A laptop API needs a tunnel only while Render is down:
 
 ```sh
 ngrok http 3001
 # put the https host in apps/web/vercel.json, then redeploy apps/web
 ```
-
-That tunnel is what `apps/web/vercel.json` uses today. [`deploy.md`](deploy.md) replaces it with a stable API host.
 
 Set the Developer Portal mini app URL to that web host. Set `WORLD_APP_ID`, `WORLD_NOTIFICATION_API_KEY`, and `SESSION_SECRET` in `.env` for the API. `WORLDCHAIN_RPC_URL` is optional. Generate the session secret once and keep it, or every API restart signs everyone out:
 

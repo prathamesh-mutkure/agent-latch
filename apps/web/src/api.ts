@@ -7,17 +7,14 @@ import { clearSession, currentSession } from "./session";
 import type { SignedWalletAuth } from "./world";
 
 // Same origin as the page. Vite in dev, and Vercel in production, proxy /api
-// to the API. Every call is a fetch with this header, so the free ngrok tunnel
-// returns JSON instead of its browser warning page.
-const tunnelHeaders = { "ngrok-skip-browser-warning": "1" };
-
+// to the API.
 export const client: AgentLatchClient = createAgentLatchClient(
   `${window.location.origin}/api`,
   () => {
     const session = currentSession();
     return session
-      ? { ...tunnelHeaders, authorization: `Bearer ${session.token}` }
-      : tunnelHeaders;
+      ? { authorization: `Bearer ${session.token}` }
+      : {};
   },
 );
 

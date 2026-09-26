@@ -47,12 +47,23 @@ function ConsoleShell() {
     <div className="min-h-screen bg-paper text-ink md:grid md:grid-cols-[220px_1fr]">
       <aside className="flex flex-col border-b border-line bg-ink text-paper md:min-h-screen md:border-r md:border-b-0">
         <div className="px-4 py-5">
-          <Link to="/" className="text-base font-semibold tracking-tight">
-            DSAP
+          <Link to="/" className="flex items-center gap-3">
+            <img
+              src="/logo.png"
+              alt=""
+              width={36}
+              height={36}
+              className="size-9 rounded-lg"
+            />
+            <span>
+              <span className="block text-base font-semibold tracking-tight">
+                DSAP
+              </span>
+              <span className="mt-0.5 block text-xs leading-snug text-paper/60">
+                Delegated Spend Authorization Protocol
+              </span>
+            </span>
           </Link>
-          <p className="mt-1 text-xs leading-snug text-paper/60">
-            Delegated Spend Authorization Protocol
-          </p>
         </div>
         {session ? (
           <nav className="flex gap-1 overflow-x-auto px-3 pb-4 md:grid md:px-3">
