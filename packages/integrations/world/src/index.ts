@@ -19,6 +19,8 @@ export type WorldIdentity = {
   sub: string;
   /** When the human last proved with World ID, from the ID token. */
   authTime: Date;
+  /** Verification level. Step-up accepts only `ORB_ACR`. */
+  acr?: string;
 };
 
 export type AuthorizeRequest = {
@@ -95,6 +97,7 @@ export async function buildAuthorizeUrl(
   if (options.fresh) {
     parameters.max_age = "0";
     parameters.acr_values = ORB_ACR;
+    parameters.prompt = "login";
   }
   const url = oidc.buildAuthorizationUrl(config, parameters);
   return { url: url.href, state, nonce, verifier };
@@ -131,7 +134,204 @@ export async function redeemCode(
     iss: claims.iss,
     sub: claims.sub,
     authTime: new Date(claims.auth_time * 1000),
+    acr: typeof claims.acr === "string" ? claims.acr : undefined,
   };
+}
+
+export type StepUpHandoff = {
+  state: string;
+  nonce: string;
+  verifier: string;
+  transactionId: string;
+  /**
+   * Cookie that marks this server as the OIDC initiator. The browser must not
+   * receive it: World's page auto-approves a fake identity when the opener is
+   * the initiator.
+   */
+  initiatorCookie: string;
+  /** World page for the human. Opening it does not make this browser the initiator. */
+  humanUrl: string;
+};
+
+export type WorldStepView = {
+  status: string;
+  connectorUri?: string;
+};
+
+function issuerOrigin(settings: WorldSettings): string {
+  return new URL(settings.issuer).origin;
+}
+
+function transactionUrl(
+  settings: WorldSettings,
+  transactionId: string,
+): string {
+  return new URL(
+    `/api/v1/authorization-transactions/${transactionId}`,
+    issuerOrigin(settings),
+  ).href;
+}
+
+function initiatorCookie(response: Response): string | null {
+  const listed =
+    typeof response.headers.getSetCookie === "function"
+      ? response.headers.getSetCookie()
+      : [response.headers.get("set-cookie") ?? ""];
+  for (const raw of listed) {
+    const pair = raw.split(";")[0]?.trim();
+    if (pair?.startsWith("__Host-idp-authorization-")) {
+      return pair;
+    }
+  }
+  return null;
+}
+
+function appLink(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  if (value.startsWith("https://") || value.startsWith("worldapp://")) {
+    return value;
+  }
+  return undefined;
+}
+
+async function readWorldStep(
+  settings: WorldSettings,
+  transactionId: string,
+  cookie: string,
+): Promise<WorldStepView> {
+  const response = await fetch(transactionUrl(settings, transactionId), {
+    headers: { cookie },
+  });
+  if (!response.ok) {
+    throw new WorldError("World did not return the approval.");
+  }
+  const body = (await response.json()) as {
+    status?: unknown;
+    connectorUri?: unknown;
+  };
+  if (typeof body.status !== "string") {
+    throw new WorldError("World approval has no status.");
+  }
+  return { status: body.status, connectorUri: appLink(body.connectorUri) };
+}
+
+/**
+ * Starts a step-up as this server, then hands the human a World page that
+ * cannot finish the approval by itself. The sandbox auto-runs ceremony,
+ * approve, and complete when the browser that opened the authorize URL is the
+ * initiator. Keeping that cookie here stops that.
+ */
+export async function beginStepUp(
+  settings: WorldSettings,
+  options: { nonce: string },
+): Promise<StepUpHandoff> {
+  const request = await buildAuthorizeUrl(settings, {
+    nonce: options.nonce,
+    fresh: true,
+  });
+  const started = await fetch(request.url, { redirect: "manual" });
+  const location = started.headers.get("location");
+  const cookie = initiatorCookie(started);
+  const transactionId = location
+    ? new URL(location, issuerOrigin(settings)).searchParams.get(
+        "transaction_id",
+      )
+    : null;
+  if (!transactionId || !cookie) {
+    throw new WorldError("World did not start an approval.");
+  }
+  const ceremony = await fetch(
+    `${transactionUrl(settings, transactionId)}/ceremony`,
+    {
+      method: "POST",
+      headers: {
+        cookie,
+        "content-type": "application/json",
+        origin: issuerOrigin(settings),
+      },
+      body: "{}",
+    },
+  );
+  if (!ceremony.ok && ceremony.status !== 204) {
+    throw new WorldError("World did not open the approval.");
+  }
+  let view = await readWorldStep(settings, transactionId, cookie);
+  for (let attempt = 0; attempt < 5 && view.status === "ready"; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    view = await readWorldStep(settings, transactionId, cookie);
+  }
+  if (view.status === "ready" || view.status === "failed") {
+    throw new WorldError("World did not open the approval.");
+  }
+  return {
+    state: request.state,
+    nonce: request.nonce,
+    verifier: request.verifier,
+    transactionId,
+    initiatorCookie: cookie,
+    humanUrl: new URL(
+      `/authorize?transaction_id=${transactionId}`,
+      issuerOrigin(settings),
+    ).href,
+  };
+}
+
+/** Current World status for a step-up this server started. */
+export function readStepUp(
+  settings: WorldSettings,
+  handoff: { transactionId: string; initiatorCookie: string },
+): Promise<WorldStepView> {
+  return readWorldStep(
+    settings,
+    handoff.transactionId,
+    handoff.initiatorCookie,
+  );
+}
+
+/**
+ * Finishes a step-up only after the human has approved it on World's page.
+ * Calling this while the status is still `verified` would skip that click.
+ */
+export async function completeStepUp(
+  settings: WorldSettings,
+  handoff: {
+    transactionId: string;
+    initiatorCookie: string;
+    state: string;
+    nonce: string;
+    verifier: string;
+  },
+): Promise<WorldIdentity> {
+  const view = await readWorldStep(
+    settings,
+    handoff.transactionId,
+    handoff.initiatorCookie,
+  );
+  if (view.status !== "approved") {
+    throw new WorldError("World approval is not confirmed yet.");
+  }
+  const completed = await fetch(
+    `${transactionUrl(settings, handoff.transactionId)}/complete`,
+    {
+      method: "POST",
+      headers: {
+        cookie: handoff.initiatorCookie,
+        "content-type": "application/json",
+        origin: issuerOrigin(settings),
+      },
+      body: "{}",
+    },
+  );
+  if (!completed.ok) {
+    throw new WorldError("World did not finish the approval.");
+  }
+  const body = (await completed.json()) as { redirectUri?: unknown };
+  if (typeof body.redirectUri !== "string") {
+    throw new WorldError("World did not return an approval code.");
+  }
+  return redeemCode(settings, new URL(body.redirectUri).searchParams, handoff);
 }
 
 export type BindingFields = {
@@ -191,7 +391,8 @@ export type TicketFailure =
   | "EXPIRED"
   | "BINDING"
   | "WRONG_HUMAN"
-  | "STALE_VERIFICATION";
+  | "STALE_VERIFICATION"
+  | "WEAK_PROOF";
 
 export type TicketCheck = { ok: true } | { ok: false; reason: TicketFailure };
 
@@ -231,6 +432,9 @@ export function checkApprovalTicket(input: {
   }
   if (!owner || owner.iss !== identity.iss || owner.sub !== identity.sub) {
     return { ok: false, reason: "WRONG_HUMAN" };
+  }
+  if (identity.acr !== ORB_ACR) {
+    return { ok: false, reason: "WEAK_PROOF" };
   }
   const authTime = identity.authTime.getTime();
   if (

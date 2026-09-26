@@ -178,6 +178,15 @@ The mini app is the phone surface for approvals. It does not replace the World I
 - The phone UI is `/mini` on `apps/web`, the same host as `WORLD_REDIRECT_URI`. `apps/world-miniapp` stays empty so a second host does not create a second World `sub`.
 - A missing `WORLD_APP_ID`, a missing notification key, or no linked wallet skips the push. The approval still opens.
 
+## 2026-09-27 — World step-up does not auto-approve
+
+Supersedes the step-up redirect in "World ID for Agents" for how the browser reaches World. The ticket checks stay, with one added claim.
+
+- The sandbox page auto-runs ceremony, approve, and complete when the browser that opened the authorize URL is the initiator. That path issues a fake orb identity and would settle the action with no human click.
+- `GET /auth/world/step-up` starts the request on the API and keeps the initiator cookie in the attempt cookie. The browser goes to `/approve/:id?handoff=1` and opens World's human page without that cookie.
+- The API redeems the code only after World reports the transaction `approved`. `verified` is not enough. Sign-in still sends the browser to the authorize URL.
+- A fresh step-up sends `prompt=login` as well as `max_age=0` and the orb `acr_values`. The ticket must carry `acr` `https://world.org/oidc/acr/orb-v3`, or the approval fails `WEAK_PROOF`.
+
 ## How to change a decision
 
 Add a new dated section that names what it supersedes. Leave the old section in place and mark it superseded.

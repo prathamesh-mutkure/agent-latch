@@ -1,5 +1,12 @@
-import { Link, useParams, useSearch } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearch,
+} from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { type StepUpStatus, stepUpStatus } from "../api";
 import { useAgents, useApproval, useMe } from "../hooks";
 import { formatDollars } from "../model";
 import {
@@ -71,7 +78,91 @@ const outcomes: Record<string, { tone: "allow" | "block"; text: string }> = {
     tone: "block",
     text: "World ID returned a ticket the server could not validate.",
   },
+  weak: {
+    tone: "block",
+    text: "World ID did not return an orb proof. Nothing ran.",
+  },
+  world_closed: {
+    tone: "block",
+    text: "World ID closed that request before you confirmed it. Nothing ran. You can start again.",
+  },
 };
+
+function worldWaitCopy(status: string): string {
+  if (
+    status === "waiting_for_connection" ||
+    status === "awaiting_confirmation"
+  ) {
+    return "Approve the request in World ID app. This page applies it after World ID says you confirmed.";
+  }
+  if (status === "verified") {
+    return "Confirm the approval on the World ID page. It does not finish from this tab.";
+  }
+  return "Open World ID and confirm this decision. Nothing runs until you do.";
+}
+
+function WorldHandoff({
+  status,
+  error,
+  pending,
+}: {
+  status: StepUpStatus | undefined;
+  error: unknown;
+  pending: boolean;
+}) {
+  if (error) {
+    return (
+      <p className="mt-4 text-sm text-block" role="alert">
+        {error instanceof Error ? error.message : "Could not check World ID."}
+      </p>
+    );
+  }
+  if (pending && !status) {
+    return (
+      <p className="mt-4 text-sm text-muted" role="status">
+        Checking World ID.
+      </p>
+    );
+  }
+  if (!status || status.phase === "idle") {
+    return (
+      <p className="mt-4 text-sm text-muted" role="status">
+        This World ID request expired. Start the approval again.
+      </p>
+    );
+  }
+  if (status.phase === "done") {
+    return (
+      <p className="mt-4 text-sm text-muted" role="status">
+        World ID finished. Applying your decision.
+      </p>
+    );
+  }
+  return (
+    <div className="mt-4 flex flex-col items-start gap-3">
+      <p className="text-sm text-muted" role="status">
+        {worldWaitCopy(status.worldStatus)}
+      </p>
+      <a
+        href={status.humanUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper"
+      >
+        Open World ID approval
+      </a>
+      {status.connectorUri ? (
+        <a
+          href={status.connectorUri}
+          className="text-sm underline"
+          rel="noopener noreferrer"
+        >
+          Open World ID app
+        </a>
+      ) : null}
+    </div>
+  );
+}
 
 function countdown(iso: string, now: number): string {
   const seconds = Math.max(
@@ -84,8 +175,28 @@ function countdown(iso: string, now: number): string {
 
 export function ApprovePage() {
   const { approvalId } = useParams({ from: "/approve/$approvalId" });
-  const { result } = useSearch({ from: "/approve/$approvalId" });
+  const { result, handoff } = useSearch({ from: "/approve/$approvalId" });
+  const navigate = useNavigate();
   const approval = useApproval(approvalId);
+  const stepUp = useQuery({
+    queryKey: ["world-step-up", approvalId],
+    queryFn: stepUpStatus,
+    enabled: handoff === "1" && !result,
+    refetchInterval: (query) =>
+      query.state.data?.phase === "done" ? false : 2000,
+  });
+  useEffect(() => {
+    const status = stepUp.data;
+    if (status?.phase !== "done") {
+      return;
+    }
+    void navigate({
+      to: "/approve/$approvalId",
+      params: { approvalId },
+      search: { result: status.result },
+      replace: true,
+    });
+  }, [approvalId, navigate, stepUp.data]);
   const agents = useAgents();
   const me = useMe();
   const [now, setNow] = useState(Date.now());
@@ -158,7 +269,21 @@ export function ApprovePage() {
                 <ClaimButton agentId={agent.id} />
               </div>
             ) : null}
-            {data.status === "PENDING" ? (
+            {handoff === "1" && !result && data.status === "PENDING" ? (
+              <WorldHandoff
+                status={stepUp.data}
+                error={stepUp.error}
+                pending={stepUp.isPending}
+              />
+            ) : null}
+            {data.status === "PENDING" &&
+            !(
+              handoff === "1" &&
+              !result &&
+              (stepUp.isPending ||
+                stepUp.data?.phase === "waiting" ||
+                stepUp.data?.phase === "done")
+            ) ? (
               <ApprovalActions approvalId={data.id} label={label} />
             ) : null}
           </Panel>

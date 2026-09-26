@@ -44,7 +44,8 @@ export type StepUpResult =
   | "payment_failed"
   | "deny_cancelled"
   | "passport_inactive"
-  | "passport_unread";
+  | "passport_unread"
+  | "weak";
 
 type ApprovalRow = typeof approvals.$inferSelect;
 
@@ -346,6 +347,7 @@ const failureResults = {
   BINDING: "binding",
   WRONG_HUMAN: "wrong_human",
   STALE_VERIFICATION: "stale",
+  WEAK_PROOF: "weak",
 } as const;
 
 /**

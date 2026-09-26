@@ -1,5 +1,8 @@
 import {
+  beginStepUp,
   buildAuthorizeUrl,
+  completeStepUp,
+  readStepUp,
   redeemCode,
   sameSecret,
   stepUpNonce,
@@ -54,6 +57,13 @@ function walletNonce(): string {
 function approvePage(approvalId: string, result: StepUpResult | string) {
   return `/approve/${approvalId}?result=${result}`;
 }
+
+function handoffPage(approvalId: string) {
+  return `/approve/${approvalId}?handoff=1`;
+}
+
+/** One finish at a time per World transaction, so two polls cannot redeem one code. */
+const finishing = new Set<string>();
 
 function refusalResult(status: number): string {
   if (status === 403) {
@@ -115,19 +125,29 @@ export const authRoutes = new Elysia()
         );
       }
       // The ID token must carry this nonce, so the ticket fits this one
-      // decision on this one action.
-      const request = await buildAuthorizeUrl(settings, {
-        nonce: stepUpNonce(started.value.bindingHash, query.decision),
-        fresh: true,
-      });
+      // decision on this one action. The browser is sent to World's human
+      // page, not the authorize URL, so it is not the initiator.
+      let handoff: Awaited<ReturnType<typeof beginStepUp>>;
+      try {
+        handoff = await beginStepUp(settings, {
+          nonce: stepUpNonce(started.value.bindingHash, query.decision),
+        });
+      } catch (error) {
+        console.log(
+          `world step-up did not start: ${error instanceof Error ? error.message : "error"}`,
+        );
+        return redirect(approvePage(query.approval, "invalid_ticket"), 302);
+      }
       const now = Date.now();
       const attempt = sealCookie({
         kind: "step-up",
-        state: request.state,
-        nonce: request.nonce,
-        verifier: request.verifier,
+        state: handoff.state,
+        nonce: handoff.nonce,
+        verifier: handoff.verifier,
         approvalId: query.approval,
         decision: query.decision,
+        transactionId: handoff.transactionId,
+        initiatorCookie: handoff.initiatorCookie,
         startedAt: now,
         exp: Math.floor(now / 1000) + ATTEMPT_TTL_S,
       } satisfies Attempt);
@@ -136,10 +156,96 @@ export const authRoutes = new Elysia()
         ...cookieDefaults,
         maxAge: ATTEMPT_TTL_S,
       });
-      return redirect(request.url, 302);
+      return redirect(handoffPage(query.approval), 302);
     },
     { query: stepUpQuery },
   )
+  .get("/auth/world/step-up/status", async ({ cookie, set, userId }) => {
+    set.headers["cache-control"] = "no-store";
+    const settings = worldSettings();
+    if (!settings) {
+      set.status = 503;
+      return { error: NOT_CONFIGURED };
+    }
+    if (!userId) {
+      set.status = 401;
+      return { error: "Sign in with World ID first." };
+    }
+    const attempt = openCookie<Attempt>(cookie[ATTEMPT_COOKIE]?.value);
+    if (
+      attempt?.kind !== "step-up" ||
+      !attempt.approvalId ||
+      !attempt.transactionId ||
+      !attempt.initiatorCookie
+    ) {
+      return { phase: "idle" as const };
+    }
+    const humanUrl = new URL(
+      `/authorize?transaction_id=${attempt.transactionId}`,
+      settings.issuer,
+    ).href;
+    const view = await readStepUp(settings, {
+      transactionId: attempt.transactionId,
+      initiatorCookie: attempt.initiatorCookie,
+    });
+    if (view.status === "rejected") {
+      clearCookie(cookie[ATTEMPT_COOKIE]);
+      const result = await cancelStepUp(
+        attempt.approvalId,
+        userId,
+        attempt.decision ?? "approve",
+      );
+      return { phase: "done" as const, result };
+    }
+    if (
+      view.status === "expired" ||
+      view.status === "failed" ||
+      view.status === "world_id_3_not_available"
+    ) {
+      clearCookie(cookie[ATTEMPT_COOKIE]);
+      return { phase: "done" as const, result: "world_closed" };
+    }
+    if (view.status !== "approved" || finishing.has(attempt.transactionId)) {
+      return {
+        phase: "waiting" as const,
+        humanUrl,
+        connectorUri: view.connectorUri,
+        worldStatus: view.status,
+      };
+    }
+    finishing.add(attempt.transactionId);
+    try {
+      let identity: Awaited<ReturnType<typeof completeStepUp>>;
+      try {
+        identity = await completeStepUp(settings, {
+          transactionId: attempt.transactionId,
+          initiatorCookie: attempt.initiatorCookie,
+          state: attempt.state,
+          nonce: attempt.nonce,
+          verifier: attempt.verifier,
+        });
+      } catch (error) {
+        console.log(
+          `world step-up finish rejected: ${error instanceof Error ? error.message : "error"}`,
+        );
+        clearCookie(cookie[ATTEMPT_COOKIE]);
+        return { phase: "done" as const, result: "invalid_ticket" };
+      }
+      clearCookie(cookie[ATTEMPT_COOKIE]);
+      const result = await decideWithWorld(
+        attempt.approvalId,
+        identity,
+        attempt.nonce,
+        attempt.decision ?? "approve",
+      );
+      if (result === "paid" || result === "approved" || result === "denied") {
+        await notifyDecision(attempt.approvalId, result);
+      }
+      return { phase: "done" as const, result };
+    } finally {
+      finishing.delete(attempt.transactionId);
+    }
+  })
   .get(
     "/auth/world/callback",
     async ({ request, cookie, redirect, set, userId }) => {

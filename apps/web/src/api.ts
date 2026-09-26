@@ -118,9 +118,35 @@ export async function getApproval(approvalId: string) {
   return data;
 }
 
-// Approve and deny are not API calls. Each is a full-page redirect to World ID:
-// /auth/world/step-up?approval=:id&decision=approve|deny. The server applies
-// the decision only after it checks the fresh World ID ticket.
+// Approve and deny are full-page visits to
+// /auth/world/step-up?approval=:id&decision=approve|deny. The API starts World
+// ID, then the approve page polls until the human confirms on World's page.
+
+export type StepUpStatus =
+  | { phase: "idle" }
+  | {
+      phase: "waiting";
+      humanUrl: string;
+      connectorUri?: string;
+      worldStatus: string;
+    }
+  | { phase: "done"; result: string };
+
+export async function stepUpStatus(): Promise<StepUpStatus> {
+  const response = await apiFetch("/auth/world/step-up/status");
+  const body = (await response.json()) as StepUpStatus & { error?: string };
+  if (!response.ok) {
+    throw new Error(body.error ?? "Could not check World ID.");
+  }
+  if (
+    body.phase !== "idle" &&
+    body.phase !== "waiting" &&
+    body.phase !== "done"
+  ) {
+    throw new Error("World ID status was not recognized.");
+  }
+  return body;
+}
 
 export async function getMe() {
   const result = await client.me.get();

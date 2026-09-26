@@ -19,6 +19,10 @@ export type Attempt = {
   nonce: string;
   verifier: string;
   approvalId?: string;
+  /** World transaction this server started. Absent on a plain sign-in. */
+  transactionId?: string;
+  /** Initiator cookie for that transaction. Stays on the API. */
+  initiatorCookie?: string;
   startedAt: number;
   exp: number;
 };
