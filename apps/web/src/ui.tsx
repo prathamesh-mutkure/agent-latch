@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { type ReactNode, useState } from "react";
 import { useMe } from "./hooks";
 
 export function toneFor(kind: string): "allow" | "block" | "wait" | "neutral" {
@@ -150,6 +151,60 @@ export function ApprovalActions({
   label: string;
 }) {
   const me = useMe();
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState<"approve" | "deny" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function decide(decision: "approve" | "deny") {
+    setError(null);
+    setBusy(decision);
+    const popup = window.open("", "agentlatch-world");
+    try {
+      const response = await fetch(
+        `/auth/world/step-up?approval=${approvalId}&decision=${decision}`,
+        {
+          headers: {
+            accept: "application/json",
+            "ngrok-skip-browser-warning": "1",
+          },
+        },
+      );
+      const body = (await response.json()) as {
+        humanUrl?: string;
+        result?: string;
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(body.error ?? "World ID did not start.");
+      }
+      if (body.result) {
+        popup?.close();
+        await navigate({
+          to: "/approve/$approvalId",
+          params: { approvalId },
+          search: { result: body.result },
+        });
+        return;
+      }
+      if (body.humanUrl && popup) {
+        popup.location.href = body.humanUrl;
+      } else {
+        popup?.close();
+      }
+      await navigate({
+        to: "/approve/$approvalId",
+        params: { approvalId },
+        search: { handoff: "1" },
+      });
+    } catch (caught) {
+      popup?.close();
+      setError(
+        caught instanceof Error ? caught.message : "World ID did not start.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
 
   if (!me.data) {
     return (
@@ -166,20 +221,29 @@ export function ApprovalActions({
 
   return (
     <div className="mt-4 flex flex-wrap items-center gap-3">
-      <a
-        href={`/auth/world/step-up?approval=${approvalId}&decision=approve`}
-        className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper"
+      <button
+        type="button"
+        className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper disabled:opacity-50"
         aria-label={`Approve ${label} with World ID`}
+        disabled={busy !== null}
+        onClick={() => void decide("approve")}
       >
-        Approve with World ID
-      </a>
-      <a
-        href={`/auth/world/step-up?approval=${approvalId}&decision=deny`}
-        className="rounded-md border border-block px-4 py-2 text-sm font-medium text-block"
+        {busy === "approve" ? "Opening World ID…" : "Approve with World ID"}
+      </button>
+      <button
+        type="button"
+        className="rounded-md border border-block px-4 py-2 text-sm font-medium text-block disabled:opacity-50"
         aria-label={`Deny ${label} with World ID`}
+        disabled={busy !== null}
+        onClick={() => void decide("deny")}
       >
-        Deny with World ID
-      </a>
+        {busy === "deny" ? "Opening World ID…" : "Deny with World ID"}
+      </button>
+      {error ? (
+        <p role="alert" className="text-sm text-block">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

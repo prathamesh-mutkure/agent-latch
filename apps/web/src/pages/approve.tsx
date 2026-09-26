@@ -127,7 +127,7 @@ function WorldHandoff({
   if (!status || status.phase === "idle") {
     return (
       <p className="mt-4 text-sm text-muted" role="status">
-        This World ID request expired. Start the approval again.
+        Starting World ID. Confirm the approval in the window that opened.
       </p>
     );
   }

@@ -108,21 +108,27 @@ export const authRoutes = new Elysia()
   })
   .get(
     "/auth/world/step-up",
-    async ({ query, cookie, redirect, set, userId }) => {
+    async ({ query, cookie, redirect, request, set, userId }) => {
+      const wantsJson = request.headers
+        .get("accept")
+        ?.includes("application/json");
+      const finish = (result: string) => {
+        if (wantsJson) {
+          return { result };
+        }
+        return redirect(approvePage(query.approval, result), 302);
+      };
       const settings = worldSettings();
       if (!settings || !process.env.COOKIE_SECRET) {
         set.status = 503;
         return { error: NOT_CONFIGURED };
       }
       if (!userId) {
-        return redirect(approvePage(query.approval, "signed_out"), 302);
+        return finish("signed_out");
       }
       const started = await startStepUp(query.approval, userId);
       if (!started.ok) {
-        return redirect(
-          approvePage(query.approval, refusalResult(started.status)),
-          302,
-        );
+        return finish(refusalResult(started.status));
       }
       // The ID token must carry this nonce, so the ticket fits this one
       // decision on this one action. The browser is sent to World's human
@@ -136,7 +142,7 @@ export const authRoutes = new Elysia()
         console.log(
           `world step-up did not start: ${error instanceof Error ? error.message : "error"}`,
         );
-        return redirect(approvePage(query.approval, "invalid_ticket"), 302);
+        return finish("invalid_ticket");
       }
       const now = Date.now();
       const attempt = sealCookie({
@@ -156,6 +162,9 @@ export const authRoutes = new Elysia()
         ...cookieDefaults,
         maxAge: ATTEMPT_TTL_S,
       });
+      if (wantsJson) {
+        return { humanUrl: handoff.humanUrl };
+      }
       return redirect(handoffPage(query.approval), 302);
     },
     { query: stepUpQuery },
