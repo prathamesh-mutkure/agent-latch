@@ -1,5 +1,6 @@
 import "./env";
 import { Elysia } from "elysia";
+import { applyMigrations } from "./db/migrate";
 import { actionRoutes } from "./modules/actions/routes";
 import { agentsRoutes } from "./modules/agents/routes";
 import { approvalRoutes } from "./modules/approvals/routes";
@@ -14,6 +15,8 @@ export const app = new Elysia()
   .use(auditRoutes);
 
 if (import.meta.main) {
+  await applyMigrations();
+  console.log("migrations applied");
   const port = Number(process.env.PORT ?? 3001);
   app.listen(port);
   console.log(`api listening on ${app.server?.hostname}:${app.server?.port}`);

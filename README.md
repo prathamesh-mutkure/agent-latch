@@ -10,13 +10,14 @@ Product direction lives in [`docs/agent/planning.md`](docs/agent/planning.md). W
 bun install
 cp .env.example .env
 bun run infra:up
-bun run db:migrate
 bun run dev
 ```
 
+The API applies database migrations on startup. More commands, including how to run the agent alone, are in [`docs/agent/commands.md`](docs/agent/commands.md).
+
 - Web: http://localhost:5173
 - API health: http://localhost:3001/health
-- Agent process stays idle until Phase 3
+- Agent: background process started by `bun run dev`
 
 The API stores agents, policies, actions, approvals, and an audit log in Postgres. `PUT /agents/:id/policy` sets USDC limits. `POST /agents/:id/actions` returns allow, block, or an approval id. Approve or reject at `POST /approvals/:id/approve` and `POST /approvals/:id/reject`. The timeline is `GET /agents/:id/audit`. Field details are in `docs/agent/current-state.md`.
 

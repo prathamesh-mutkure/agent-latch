@@ -1,15 +1,15 @@
 # Current state
 
-**Phase:** 2 complete. Next is Phase 3.
+**Phase:** 3 complete. Dashboard is in progress in `apps/web`.
 **Updated:** 2026-09-26
 
 ## What runs
 
 - `packages/core` — `ActionRequest`, `Policy`, `PolicyDecision`, `ApprovalRequest`. `evaluatePolicy` is pure and does not create approval ids. Amounts are USDC base units.
-- `apps/api` — Postgres control plane via Drizzle, split into `modules/{agents,actions,approvals,audit,health}`. Zod validates requests. `to*Dto` shapes responses. Data survives an API restart.
+- `apps/api` — Postgres control plane via Drizzle. Applies `db/migrations` on startup. Zod validates requests. `to*Dto` shapes responses.
 - Allowed actions execute through a simulated executor. `signed` is always false. No key is read. The future signer is a separate module from executors. See `packages/signers/`.
-- `apps/web` — home page only. It does not call the API yet.
-- `apps/agent` — still idle. It does not submit actions until Phase 3.
+- `apps/web` — dashboard in progress. Keep approve and reject response shapes stable.
+- `apps/agent` — background process. Reuses `trader`, posts a mock SWAP cycle to the API, and polls when an action needs approval. It does not approve itself.
 
 `bun run typecheck` and `bun run lint` are the checks. CI runs those two. There is no unit test suite.
 
@@ -22,7 +22,7 @@ Demo policy: autonomous 500 USDC, hard limit 5000 USDC. 100 allows, 600 waits fo
 | Path | Phase |
 | --- | --- |
 | `db/seed` | optional local seed, unused |
-| `packages/executors/api` | 3 |
+| `packages/executors/api` | later; API simulates execution |
 | `packages/integrations/ens`, `contracts/` | 4 |
 | `packages/integrations/world` | 5 |
 | `packages/integrations/intercepta`, `packages/integrations/x402`, `packages/executors/x402` | 6 |
@@ -33,7 +33,7 @@ Demo policy: autonomous 500 USDC, hard limit 5000 USDC. 100 allows, 600 waits fo
 | `packages/signers/alchemy` | later extension, not the default |
 | `packages/sdk`, `packages/contracts` | later |
 
-Local Postgres is `bun run infra:up`, then `bun run db:migrate`. `infra:down` stops it. `infra:reset` drops the volume and migrates again. No contracts and no sponsor SDKs. `GET /agents/:agentId/audit` is the timeline. `GET /health` reports whether the database is up.
+Local Postgres is `bun run infra:up`. The API migrates on startup. `infra:down` stops Postgres. `infra:reset` drops the volume and migrates again. Command list is `docs/agent/commands.md`. No contracts and no sponsor SDKs. `GET /agents/:agentId/audit` is the timeline. `GET /health` reports whether the database is up.
 
 ## API
 
@@ -49,6 +49,6 @@ List routes: `GET /agents`, `GET /agents/:agentId`, `GET /agents/:agentId/policy
 
 Daily limit is optional and must be at least the autonomous limit. Pending approvals expire after 15 minutes. No login.
 
-## Phase 3 next
+## Next open track
 
-Background agent. It should notice a mocked condition, submit an `ActionRequest`, and keep running when the dashboard is closed. Leave the signer and sponsor integrations alone.
+Phase 4, ENSv2, in `packages/integrations/ens`. Leave `apps/web` alone. Add identity fields without changing approve and reject response shapes while the dashboard is wiring them. Phase 5 (World) is after ENS. Phase 6 (Intercepta and x402) is after World.

@@ -76,6 +76,10 @@ Supersedes the schema path in "Database".
 - `apps/api/src/db/schema.ts` only re-exports the tables for the client and drizzle-kit.
 - SQL migrations stay in `db/migrations`.
 
+## 2026-09-26 — Migrations on startup
+
+The API applies `db/migrations` before it listens. `bun run db:migrate` still applies them without booting the API. `infra:reset` still migrates after recreating Postgres.
+
 ## How to change a decision
 
 Add a new dated section that names what it supersedes. Leave the old section in place and mark it superseded.
