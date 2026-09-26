@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useState } from "react";
-import { issueAgentKey } from "../api";
+import { issueAgentKey, registerAgentEns } from "../api";
 import {
   useActions,
   useAgents,
@@ -11,6 +11,7 @@ import {
 } from "../hooks";
 import {
   agentPosture,
+  ensState,
   formatBaseUnits,
   formatDollars,
   formatExpiry,
@@ -70,11 +71,16 @@ export function AgentPage() {
         <>
           <div className="mb-8 flex flex-wrap items-center gap-3">
             <h1 className="text-3xl font-semibold tracking-tight">
-              {agent.ens.name ?? agent.name}
+              {agent.ens.name ?? agent.ensName}
             </h1>
             <Pill>{posture}</Pill>
-            <Pill>{agent.ens.status}</Pill>
+            <Pill>{ensState(agent)}</Pill>
           </div>
+          {agent.ens.status !== "REGISTERED" ? (
+            <div className="mb-4">
+              <EnsRegistration agent={agent} />
+            </div>
+          ) : null}
           <div className="mb-4">
             <AgentKey agentId={agent.id} hasKey={agent.hasKey} />
           </div>
@@ -303,6 +309,62 @@ function AgentKey({ agentId, hasKey }: { agentId: string; hasKey: boolean }) {
       <pre className="mt-2 overflow-x-auto rounded-md border border-line p-3 font-mono text-xs">
         {snippet}
       </pre>
+    </Panel>
+  );
+}
+
+/** Starts or retries the background ENS registration. The agent list polls its state. */
+function EnsRegistration({
+  agent,
+}: {
+  agent: {
+    id: string;
+    ensName: string;
+    registration: {
+      state: "REGISTERING" | "FAILED";
+      error: string | null;
+    } | null;
+  };
+}) {
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  const running = agent.registration?.state === "REGISTERING";
+
+  async function start() {
+    setError(null);
+    try {
+      await registerAgentEns(agent.id);
+      await queryClient.invalidateQueries({ queryKey: ["agents"] });
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Registration did not start.",
+      );
+    }
+  }
+
+  return (
+    <Panel title="ENS name">
+      <p className="text-sm">
+        {running
+          ? `Registering ${agent.ensName} on Sepolia. It takes a few minutes.`
+          : `${agent.ensName} is not registered yet. Actions are blocked until it is.`}
+      </p>
+      {agent.registration?.state === "FAILED" ? (
+        <p className="mt-2 text-sm text-block">
+          Last attempt failed: {agent.registration.error}
+        </p>
+      ) : null}
+      {error ? <p className="mt-2 text-sm text-block">{error}</p> : null}
+      <button
+        type="button"
+        disabled={running}
+        onClick={() => void start()}
+        className="mt-3 rounded-md border border-ink px-4 py-2 text-sm font-medium disabled:opacity-50"
+      >
+        {running ? "Registering…" : "Register on ENS"}
+      </button>
     </Panel>
   );
 }

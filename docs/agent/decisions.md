@@ -302,6 +302,12 @@ Builds on "Agent keys". Supersedes nothing there: the agent key stays required.
 - The API checks the signature against `authAddress` in Postgres, not by reading the ENS record on every request. Used nonces are held in memory, so one API process only. Migration 0007.
 - `apps/mcp` signs its submits when `AGENT_PRIVATE_KEY` and `AGENTLATCH_AGENT_ENS` are set, next to `AGENT_KEY`. `GET /agents/:id` is owner only, so the name comes from `.env`. That key only signs requests. It never signs a payment.
 
+## 2026-09-27 — ENS registration runs in the background
+
+- Why: registering takes one to two minutes of Sepolia transactions, and more for a new username. Vercel's rewrite to the API gave up first (`ROUTER_EXTERNAL_TARGET_ERROR`), so the page never learned the result.
+- `POST /agents/:id/ens` answers 202 with `{ state: "REGISTERING" }` and runs the job on the API. Agent reads carry `registration`: `REGISTERING`, `FAILED` with the error, or null once done. A second call while one runs returns the same job. A failed job can be started again from the agent's page.
+- Jobs run one at a time because they share the executor key and its nonce. The state is in API memory, so a restart forgets a running job. Registering again resumes from what is already on chain.
+
 ## How to change a decision
 
 Add a new dated section that names what it supersedes. Leave the old section in place and mark it superseded.

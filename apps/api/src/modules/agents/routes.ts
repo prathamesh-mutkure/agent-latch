@@ -6,9 +6,11 @@ import { toPolicyDto } from "./dto";
 import {
   type AgentName,
   agentEnsName,
+  ensRegistration,
   readAgentEns,
   recordsToPublish,
   registerAgentEns,
+  startEnsRegistration,
 } from "./ens";
 import { agentIdParams, createAgentBody, setPolicyBody } from "./schemas";
 import {
@@ -20,11 +22,12 @@ import {
   setPolicy,
 } from "./service";
 
-async function agentWithEns<T extends AgentName>(agent: T) {
+async function agentWithEns<T extends AgentName & { id: string }>(agent: T) {
   return {
     ...agent,
     ensName: agentEnsName(agent),
     ens: await readAgentEns(agent),
+    registration: ensRegistration(agent.id),
   };
 }
 
@@ -90,20 +93,16 @@ export const agentsRoutes = new Elysia({ prefix: "/agents" })
         set.status = 404;
         return { error: "Agent not found." };
       }
-      try {
-        const policy = await getPolicy(agent.id);
-        return await registerAgentEns(
+      // Runs in the background. The agent list shows `registration` until
+      // the name reads back as registered.
+      set.status = 202;
+      return startEnsRegistration(agent.id, async () =>
+        registerAgentEns(
           agent,
           body.owner,
-          await recordsToPublish(agent, policy),
-        );
-      } catch (error) {
-        set.status = 400;
-        return {
-          error:
-            error instanceof Error ? error.message : "ENS registration failed.",
-        };
-      }
+          await recordsToPublish(agent, await getPolicy(agent.id)),
+        ),
+      );
     },
     {
       params: agentIdParams,

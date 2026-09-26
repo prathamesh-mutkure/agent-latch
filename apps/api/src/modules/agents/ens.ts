@@ -166,3 +166,55 @@ export async function registerAgentEns(
     records,
   });
 }
+
+/** A registration still running on Sepolia, or the last one that failed. */
+export type EnsRegistration = {
+  state: "REGISTERING" | "FAILED";
+  error: string | null;
+  startedAt: string;
+};
+
+// ponytail: in memory and one at a time. A restart forgets a running job (the
+// owner registers again, which resumes where the chain left off), and two API
+// processes could still race on the executor nonce.
+const registrations = new Map<string, EnsRegistration>();
+let queue: Promise<unknown> = Promise.resolve();
+
+export function ensRegistration(agentId: string): EnsRegistration | null {
+  return registrations.get(agentId) ?? null;
+}
+
+/**
+ * Registration takes minutes of Sepolia transactions, longer than the proxy in
+ * front of the API waits. This returns at once and runs the job in the
+ * background. Jobs share the executor key, so they run one after another.
+ */
+export function startEnsRegistration(
+  agentId: string,
+  run: () => Promise<unknown>,
+): EnsRegistration {
+  const running = registrations.get(agentId);
+  if (running?.state === "REGISTERING") {
+    return running;
+  }
+  const job: EnsRegistration = {
+    state: "REGISTERING",
+    error: null,
+    startedAt: new Date().toISOString(),
+  };
+  registrations.set(agentId, job);
+  queue = queue.then(run).then(
+    () => registrations.delete(agentId),
+    (error: unknown) => {
+      const message =
+        error instanceof Error ? error.message : "ENS registration failed.";
+      console.error(`ens registration ${agentId} failed: ${message}`);
+      registrations.set(agentId, {
+        ...job,
+        state: "FAILED",
+        error: message.split("\n")[0]?.slice(0, 300) ?? message,
+      });
+    },
+  );
+  return job;
+}

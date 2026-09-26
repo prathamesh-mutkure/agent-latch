@@ -9,7 +9,7 @@ import {
   setUsername,
 } from "../api";
 import { useAccount, useAgents, useAllActions } from "../hooks";
-import { agentPosture } from "../model";
+import { agentPosture, ensState } from "../model";
 import { Empty, PageHeader, Panel, Pill, QueryGate } from "../ui";
 
 export function AgentsPage() {
@@ -52,7 +52,7 @@ export function AgentsPage() {
                       <h2 className="text-lg font-medium">
                         {agent.ens.name ?? agent.ensName}
                       </h2>
-                      <Pill>{agent.ens.status}</Pill>
+                      <Pill>{ensState(agent)}</Pill>
                       <Pill>{posture}</Pill>
                     </div>
                     <p className="mt-3 font-mono text-sm break-all text-muted">
@@ -80,6 +80,24 @@ const USDC = /^\d+(\.\d{1,6})?$/;
 
 function isLabel(value: string): boolean {
   return value.length >= 3 && value.length <= 32 && LABEL.test(value);
+}
+
+/** Why a typed label is not an ENS label, or null when it is (or is still empty). */
+function labelProblem(value: string): string | null {
+  if (!value || isLabel(value)) {
+    return null;
+  }
+  if (/[^a-z0-9-]/.test(value)) {
+    return `Only lower-case letters, digits, and dashes. Remove ${[
+      ...new Set(value.replace(/[a-z0-9-]/g, "")),
+    ]
+      .map((char) => `"${char}"`)
+      .join(" ")}.`;
+  }
+  if (value.startsWith("-") || value.endsWith("-")) {
+    return "Start and end with a letter or digit.";
+  }
+  return "Use 3 to 32 characters.";
 }
 
 /** Same keys and values the API writes to the name (`policyRecords`). */
@@ -189,12 +207,13 @@ function RegisterAgent() {
       });
       let { setupError } = agent;
       try {
+        // Returns at once. The Sepolia transactions run on the API.
         await registerAgentEns(agent.id);
       } catch (ensError) {
         setupError =
           ensError instanceof Error
             ? ensError.message
-            : "ENS registration failed.";
+            : "ENS registration did not start.";
       }
       setCreated({ id: agent.id, key: agent.key, ensName, setupError });
       setName("");
@@ -234,6 +253,9 @@ function RegisterAgent() {
                 placeholder="alice"
                 onChange={(event) => setUsernameInput(event.target.value)}
               />
+              {labelProblem(owner) ? (
+                <span className="text-block">{labelProblem(owner)}</span>
+              ) : null}
             </label>
           )}
           <label className="grid gap-1 text-sm">
@@ -247,6 +269,9 @@ function RegisterAgent() {
               placeholder="trader"
               onChange={(event) => setName(event.target.value)}
             />
+            {labelProblem(label) ? (
+              <span className="text-block">{labelProblem(label)}</span>
+            ) : null}
           </label>
           <div className="rounded-md border border-line p-3 font-mono text-sm">
             <p className="text-muted">{parent}</p>
@@ -344,7 +369,7 @@ function RegisterAgent() {
         </fieldset>
 
         {problem && (label || username) ? (
-          <p className="text-sm text-muted">{problem}</p>
+          <p className="text-sm text-block">{problem}</p>
         ) : null}
         <p className="text-sm text-muted">
           Register creates the agent, then registers {ensName} on Sepolia with
@@ -380,8 +405,9 @@ function RegisterAgent() {
             <p className="text-sm text-block">{created.setupError}</p>
           ) : (
             <p className="text-sm text-muted">
-              <span className="font-mono">{created.ensName}</span> registered
-              with its policy records.
+              Registering <span className="font-mono">{created.ensName}</span>{" "}
+              with its policy records on Sepolia. It takes a few minutes. The
+              list below shows REGISTERED when it is done.
             </p>
           )}
           <Link

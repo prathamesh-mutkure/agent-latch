@@ -144,3 +144,11 @@ function formatUsdcToBase(usdc: string): string {
   const padded = fraction.padEnd(6, "0").slice(0, 6);
   return (BigInt(whole) * 1_000_000n + BigInt(padded || "0")).toString();
 }
+
+/** The ENS pill: a running or failed background registration wins over the chain read. */
+export function ensState(agent: {
+  ens: { status: string };
+  registration: { state: "REGISTERING" | "FAILED" } | null;
+}): string {
+  return agent.registration?.state ?? agent.ens.status;
+}
