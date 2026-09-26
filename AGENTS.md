@@ -11,7 +11,7 @@ Read these before changing architecture or starting a phase:
 
 - Build the current phase only. Leave later modules as `.gitkeep`.
 - Policy, executors, and signers stay independent of each other. Sponsors stay out of policy.
-- After a work session, update `docs/agent/current-state.md` in the same change. Replace stale status. Do not append a diary.
+- After a task, update `docs/agent/current-state.md` in the same change. Set that row's state and testing column, and update the testing section when you verified something. Do not append a diary.
 - If you settle or reverse a choice, add a dated entry to `docs/agent/decisions.md`.
 - `docs/agent/planning.md` stays the product brief. Do not turn it into a changelog.
 

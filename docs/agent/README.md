@@ -7,7 +7,7 @@ Short on purpose. Coding agents load this folder, so keep it current and small.
 | `planning.md` | Product brief and phase plan. Source of truth for what we are building. | Product direction changes. Not a changelog. |
 | `decisions.md` | Closed technical choices. | A choice is made or reversed. Add a dated entry. Mark the old one superseded. Do not delete history. |
 | `open-questions.md` | Choices we have not made. | Add a question, or delete it after it moves into `decisions.md`. |
-| `current-state.md` | What the repo contains right now, and the next phase. | End of a session or phase. Rewrite the status. Do not append a log. |
+| `current-state.md` | Todos with a testing column, plus a testing section and notes. | After every task. Update that row's state and testing column, and the testing section when you verified something. Do not append a diary. |
 | `commands.md` | Commands to run the apps, the agent, and Postgres. | A run command is added or renamed. |
 
 `AGENTS.md` at the repo root points here. Cursor and Codex load it. `CLAUDE.md` imports `AGENTS.md` for Claude Code and should not grow its own rules. Git is the sync channel: the handoff is the commit that updates `current-state.md`.

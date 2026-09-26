@@ -80,6 +80,19 @@ Supersedes the schema path in "Database".
 
 The API applies `db/migrations` before it listens. `bun run db:migrate` still applies them without booting the API. `infra:reset` still migrates after recreating Postgres.
 
+## 2026-09-26 — ENSv2
+
+- Sepolia ENSv2 addresses live in `@agentlatch/ens` and come from the deployments page. `ENS_REGISTRY_ADDRESS` overrides the default ETHRegistry. The contracts are beta.
+- Agent identity status, parent namespace, and EAC roles are read with `getState`, `getParent`, and `hasRoles`. A full name is returned only when status is `REGISTERED`. Resolution of that name is superseded below.
+- `POST /agents/:id/ens` calls `register` with the demo key. On the ETHRegistry that call reverts unless the key holds `ROLE_REGISTRAR`. Point `ENS_REGISTRY_ADDRESS` at a UserRegistry the key can register on to create subnames such as `trader.alice.eth`.
+
+## 2026-09-26 — ENSjs for resolution
+
+Supersedes the name-resolution sentence in "ENSv2".
+
+- ENSjs (`@ensdomains/ensjs`) resolves the full name with `getOwner` and `getAddressRecord` on Sepolia whenever the parent namespace is known.
+- Registry status, EAC roles, parent namespace, and `register` stay direct Permissioned Registry calls. `ens.name` is set when ENSjs returns an owner or the registry status is `REGISTERED`.
+
 ## How to change a decision
 
 Add a new dated section that names what it supersedes. Leave the old section in place and mark it superseded.

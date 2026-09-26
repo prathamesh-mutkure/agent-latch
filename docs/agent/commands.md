@@ -34,6 +34,14 @@ bun --filter @agentlatch/agent dev
 
 It reuses an agent named `trader`, sets the 500/5000 USDC policy, and cycles three mocked swaps: 100 USDC (allow), 2500 USDC (waits for approval), 10000 USDC (block). It does not approve itself.
 
+`GET /agents/:id` adds an `ens` object read from Sepolia ENSv2. Register the agent's label with:
+
+```sh
+curl -X POST "http://localhost:3001/agents/<agentId>/ens"
+```
+
+That requires `EXECUTOR_PRIVATE_KEY` and a registry where that key can register names. The default registry is the Sepolia ETHRegistry.
+
 ```sh
 # while it is waiting on the 2500 USDC swap
 curl -X POST "http://localhost:3001/approvals/<approvalId>/approve"

@@ -1,0 +1,16 @@
+{
+  "name": "@agentlatch/ens",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ensdomains/ensjs": "^4.3.1",
+    "viem": "^2.47.6"
+  }
+}

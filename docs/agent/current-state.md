@@ -1,54 +1,49 @@
 # Current state
 
-**Phase:** 3 complete. Dashboard is in progress in `apps/web`.
 **Updated:** 2026-09-26
 
-## What runs
+Rewrite the row you changed. Do not append a diary. Commands live in `commands.md`.
 
-- `packages/core` — `ActionRequest`, `Policy`, `PolicyDecision`, `ApprovalRequest`. `evaluatePolicy` is pure and does not create approval ids. Amounts are USDC base units.
-- `apps/api` — Postgres control plane via Drizzle. Applies `db/migrations` on startup. Zod validates requests. `to*Dto` shapes responses.
-- Allowed actions execute through a simulated executor. `signed` is always false. No key is read. The future signer is a separate module from executors. See `packages/signers/`.
-- `apps/web` — dashboard in progress. Keep approve and reject response shapes stable.
-- `apps/agent` — background process. Reuses `trader`, posts a mock SWAP cycle to the API, and polls when an action needs approval. It does not approve itself.
+## In progress
 
-`bun run typecheck` and `bun run lint` are the checks. CI runs those two. There is no unit test suite.
+Dashboard, phase 7, in `apps/web`. Leave approve and reject response shapes stable.
 
-Demo policy: autonomous 500 USDC, hard limit 5000 USDC. 100 allows, 600 waits for approval, 10000 blocks. An amount equal to the hard limit still needs approval. Amounts above it block. Approving executes that one action. Rejecting does not. A second decision on the same approval returns 409.
+## Todos
 
-## What is intentionally empty
+| Phase | Task | State | Testing | Notes |
+| --- | --- | --- | --- | --- |
+| 0 | Monorepo scaffold | done | passed | Typecheck, lint, apps boot |
+| 1 | In-memory control plane | done | passed | Replaced by phase 2 storage |
+| 2 | Postgres + Drizzle | done | passed | Migrations apply on API startup |
+| 3 | Background agent | done | passed | 100 allow, 2500 waits, 10000 block |
+| 4 | ENSv2 | done | partial | Parent read passed. Subname write is not testable yet |
+| 7 | Dashboard | in progress | not started | `apps/web`. Other person |
+| 5 | World ID for Agents | todo | not started | After approve and reject buttons exist |
+| 6 | Intercepta + x402 | todo | not started | After World |
+| 8 | World mini app | todo | not started | After phase 5 |
+| 9 | Uniswap | todo | not started | Optional, last |
+| 10 | Hackathon polish | todo | not started | |
 
-`.gitkeep` only. Do not implement these early.
+Empty on purpose: `db/seed`, `packages/executors/api`, `packages/integrations/world`, `packages/integrations/intercepta`, `packages/integrations/x402`, `packages/executors/x402`, `packages/api-client`, `apps/world-miniapp`, `packages/executors/uniswap`, `packages/signers/local`, `packages/signers/alchemy`, `packages/sdk`, `packages/contracts`, `contracts/`.
 
-| Path | Phase |
-| --- | --- |
-| `db/seed` | optional local seed, unused |
-| `packages/executors/api` | later; API simulates execution |
-| `packages/integrations/ens`, `contracts/` | 4 |
-| `packages/integrations/world` | 5 |
-| `packages/integrations/intercepta`, `packages/integrations/x402`, `packages/executors/x402` | 6 |
-| `packages/api-client` | 7 |
-| `apps/world-miniapp` | 8 |
-| `packages/executors/uniswap` | 9 |
-| `packages/signers/local` | when the first real signature is required |
-| `packages/signers/alchemy` | later extension, not the default |
-| `packages/sdk`, `packages/contracts` | later |
+## Testing
 
-Local Postgres is `bun run infra:up`. The API migrates on startup. `infra:down` stops Postgres. `infra:reset` drops the volume and migrates again. Command list is `docs/agent/commands.md`. No contracts and no sponsor SDKs. `GET /agents/:agentId/audit` is the timeline. `GET /health` reports whether the database is up.
+No unit test suite. Checks are `bun run typecheck` and `bun run lint`.
 
-## API
+| Check | State | Result |
+| --- | --- | --- |
+| Allow 100, approval 2500, block 10000 | done | API decisions match the demo policy |
+| Approve once, second decision 409, reject does not execute | done | |
+| Migrations apply on API startup | done | Log line `migrations applied` |
+| ENSjs + registry read of `prathamesh-reap.eth` | done | `REGISTERED`, owner and ETH address `0x6B9cE6a3463deF6A2B61f0DB5eC9C460174958A6`, expiry 2027-09-26. Roles granted: set subregistry, set resolver, transfer admin |
+| `GET /agents/:id` returns that `ens` object | todo | Hit it once the API process can reach Sepolia |
+| `POST /agents/:id/ens` creates `trader.prathamesh-reap.eth` | blocked | Parent subregistry is `0x0000…0000`. The route only calls `register` on `ENS_REGISTRY_ADDRESS`. It does not deploy a UserRegistry or call `setSubregistry`. Do not send that transaction against the ETHRegistry |
 
-Amounts are USDC strings (`"100"`, `"1.5"`). The token is Sepolia USDC unless an action names another token, which is blocked.
+## Notes
 
-- `POST /agents` `{ name }`
-- `PUT /agents/:agentId/policy` `{ autonomousLimit, hardLimit, dailyLimit?, allowedActions?, allowedTargets? }`
-- `POST /agents/:agentId/actions` `{ action, target, amount, token?, note? }`
-- `POST /approvals/:approvalId/approve`
-- `POST /approvals/:approvalId/reject`
-
-List routes: `GET /agents`, `GET /agents/:agentId`, `GET /agents/:agentId/policy`, `GET /agents/:agentId/actions`, `GET /agents/:agentId/audit`, `GET /actions/:actionId`, `GET /approvals`, `GET /approvals/:approvalId`.
-
-Daily limit is optional and must be at least the autonomous limit. Pending approvals expire after 15 minutes. No login.
-
-## Next open track
-
-Phase 4, ENSv2, in `packages/integrations/ens`. Leave `apps/web` alone. Add identity fields without changing approve and reject response shapes while the dashboard is wiring them. Phase 5 (World) is after ENS. Phase 6 (Intercepta and x402) is after World.
+- Amounts are USDC strings. One chain: Ethereum Sepolia.
+- Demo policy: autonomous 500, hard limit 5000. No daily cap on the background agent.
+- `ens.name` is set when ENSjs returns an owner or the registry status is `REGISTERED`.
+- Sepolia address for the parent name: `0x6B9cE6a3463deF6A2B61f0DB5eC9C460174958A6`.
+- `POST /agents/:id/ens` needs `EXECUTOR_PRIVATE_KEY` and `ROLE_REGISTRAR` on `ENS_REGISTRY_ADDRESS`. The public ETHRegistry will reject the demo key.
+- Simulated execution never signs. Policy stays free of sponsors.

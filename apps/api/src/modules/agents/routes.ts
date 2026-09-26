@@ -1,6 +1,7 @@
-import { Elysia } from "elysia";
+import { Elysia, t } from "elysia";
 import { respond } from "../../result";
 import { toPolicyDto } from "./dto";
+import { readAgentEns, registerAgentEns } from "./ens";
 import { agentIdParams, createAgentBody, setPolicyBody } from "./schemas";
 import {
   createAgent,
@@ -10,11 +11,18 @@ import {
   setPolicy,
 } from "./service";
 
+async function agentWithEns<T extends { name: string }>(agent: T) {
+  return { ...agent, ens: await readAgentEns(agent.name) };
+}
+
 export const agentsRoutes = new Elysia({ prefix: "/agents" })
-  .post("/", async ({ body }) => createAgent(body.name), {
+  .post("/", async ({ body }) => agentWithEns(await createAgent(body.name)), {
     body: createAgentBody,
   })
-  .get("/", async () => listAgents())
+  .get("/", async () => {
+    const agents = await listAgents();
+    return Promise.all(agents.map((agent) => agentWithEns(agent)));
+  })
   .get(
     "/:agentId",
     async ({ params, set }) => {
@@ -23,9 +31,34 @@ export const agentsRoutes = new Elysia({ prefix: "/agents" })
         set.status = 404;
         return { error: "Agent not found." };
       }
-      return agent;
+      return agentWithEns(agent);
     },
     { params: agentIdParams },
+  )
+  .post(
+    "/:agentId/ens",
+    async ({ params, body, set }) => {
+      const agent = await getAgent(params.agentId);
+      if (!agent) {
+        set.status = 404;
+        return { error: "Agent not found." };
+      }
+      try {
+        return await registerAgentEns(agent.name, body.owner);
+      } catch (error) {
+        set.status = 400;
+        return {
+          error:
+            error instanceof Error ? error.message : "ENS registration failed.",
+        };
+      }
+    },
+    {
+      params: agentIdParams,
+      body: t.Object({
+        owner: t.Optional(t.String()),
+      }),
+    },
   )
   .put(
     "/:agentId/policy",
