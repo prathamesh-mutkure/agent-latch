@@ -55,6 +55,7 @@ curl "http://localhost:3001/approvals/<approvalId>"
 ```sh
 curl -sS -D - "http://localhost:3001/x402/resource"
 curl -sS "http://localhost:3001/facilitator/supported"
+curl -sS "http://localhost:3001/x402/merchants"
 curl -X POST "http://localhost:3001/agents/<agentId>/actions" \
   -H "content-type: application/json" \
   -d '{"action":"X402_PAYMENT","target":"http://localhost:3001/x402/resource","amount":"0.01"}'
@@ -67,6 +68,31 @@ API_URL=http://localhost:3001
 AGENT_NAME=trader
 AGENT_INTERVAL_MS=10000
 AGENT_POLL_MS=2000
+```
+
+## MCP server
+
+`apps/mcp` is a stdio MCP server for AI agents. It talks to the API at `API_URL` and pays as the agent `AGENTLATCH_AGENT_ID`, else the agent named `AGENT_NAME` (default `trader`). It holds no key. Every payment is an `X402_PAYMENT` action, so the ENS policy, Intercepta, and World approval apply.
+
+Tools: `list_merchants` (`GET /x402/merchants`), `quote_resource` (reads the 402 quote, pays nothing), `pay_resource` (`url`, `maxAmountUsdc`, `note`; refuses a price above the maximum), `get_payment`, `list_payments`.
+
+```sh
+bun apps/mcp/src/index.ts
+claude mcp add agentlatch -e API_URL=http://localhost:3001 -- bun "$PWD/apps/mcp/src/index.ts"
+```
+
+Cursor or Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "agentlatch": {
+      "command": "bun",
+      "args": ["/absolute/path/to/agent-latch/apps/mcp/src/index.ts"],
+      "env": { "API_URL": "http://localhost:3001", "AGENT_NAME": "trader" }
+    }
+  }
+}
 ```
 
 ## Database

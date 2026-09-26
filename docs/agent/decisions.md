@@ -253,6 +253,16 @@ Supersedes the self-settled payment and the `?tx=` receipt check on `GET /x402/r
 - `X402_PAYMENT.target` is the resource URL, not the payee. On submit the API asks the URL for its quote. The quote must be exact Sepolia USDC for exactly the action's amount. Intercepta screens the quote's `payTo`. After an allow, the executor key signs and the API retries the URL. An approved payment quotes and screens again before it signs, because the seller may have changed its payee.
 - Unchanged: policy, the order policy then Intercepta then signing, one `LocalKeySigner`. Signer custody is still open.
 
+## 2026-09-27 — MCP server for x402 payments
+
+Supersedes "MCP server and SDK packages" in the cut column of `planning-v2.md`. The SDK package stays cut.
+
+- Why: Ankit asked for AI agents (Claude, Cursor) to find AgentLatch's x402 sellers and pay them through the gate.
+- `apps/mcp` is a stdio MCP server. It is a client of the API, not a signer. It holds no key and never builds a `PAYMENT-SIGNATURE`. A payment is an `X402_PAYMENT` action, so the order stays policy, then Intercepta, then signing, and a payment above the autonomous limit waits for World approval.
+- Tools: `list_merchants`, `quote_resource`, `pay_resource`, `get_payment`, `list_payments`. `pay_resource` takes the agent's `maxAmountUsdc`, quotes the URL, and submits the quoted price only when it is at or below that maximum.
+- The merchant registry is `GET /x402/merchants` on the API. For now it lists AgentLatch's own demo seller, the only payee its facilitator settles for. No Bazaar discovery.
+- The agent is picked by `AGENTLATCH_AGENT_ID` or `AGENT_NAME`. The API has no agent keys yet, so anyone who can reach the API can submit as any agent. The pasted-key login in `planning-v2.md` future work is still open.
+
 ## How to change a decision
 
 Add a new dated section that names what it supersedes. Leave the old section in place and mark it superseded.

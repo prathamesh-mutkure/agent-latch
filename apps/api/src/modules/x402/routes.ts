@@ -49,23 +49,56 @@ async function callFacilitator<T>(
   }
 }
 
+const DESCRIPTION = "AgentLatch paid resource. 0.01 USDC on Ethereum Sepolia.";
+
 function quote(url: string): PaymentRequired {
   return paymentRequired({
     resource: url,
     payTo: payTo(),
     amountBaseUnits: QUOTE_BASE_UNITS,
-    description: "AgentLatch paid resource. 0.01 USDC on Ethereum Sepolia.",
+    description: DESCRIPTION,
   });
 }
+
+/** One entry in AgentLatch's own seller registry. */
+export type Merchant = {
+  id: string;
+  name: string;
+  description: string;
+  url: string;
+  scheme: "exact";
+  network: typeof X402_NETWORK;
+  asset: string;
+  payTo: string;
+  amountBaseUnits: string;
+  facilitator: string;
+};
 
 /**
  * Demo seller. Without a PAYMENT-SIGNATURE header it quotes 402. With one, it
  * asks the facilitator to verify and settle, and serves the resource only after
  * the settlement lands.
  */
-export const x402Routes = new Elysia().get(
-  "/x402/resource",
-  async ({ request, set }) => {
+export const x402Routes = new Elysia()
+  .get("/x402/merchants", ({ request }): Merchant[] => {
+    const origin = new URL(request.url).origin;
+    const requirement = quote(`${origin}/x402/resource`).accepts[0];
+    return [
+      {
+        id: "agentlatch-demo",
+        name: "AgentLatch demo seller",
+        description: DESCRIPTION,
+        url: `${origin}/x402/resource`,
+        scheme: requirement.scheme,
+        network: X402_NETWORK,
+        asset: requirement.asset,
+        payTo: requirement.payTo,
+        amountBaseUnits: requirement.amount,
+        facilitator: facilitatorUrl(),
+      },
+    ];
+  })
+  .get("/x402/resource", async ({ request, set }) => {
     const required = quote(new URL(request.url).toString());
     const requirement = required.accepts[0];
     const refuse = (error: string) => {
@@ -108,5 +141,4 @@ export const x402Routes = new Elysia().get(
       txHash: settled.transaction,
       description: "Paid resource on Ethereum Sepolia.",
     };
-  },
-);
+  });
