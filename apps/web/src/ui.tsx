@@ -1,7 +1,12 @@
+import type { WorldIdCheckStatus } from "@agentlatch/core";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
-import { type Decision, decideApproval, getDecisionChallenge } from "./api";
+import {
+  type Decision,
+  decideApproval,
+  getDecisionChallenge,
+  type WorldIdPrompt,
+} from "./api";
 import { useWorldConfig } from "./hooks";
 import { insideWorldApp, miniAppUrl, signInWorldApp } from "./world";
 
@@ -183,39 +188,59 @@ export function OpenInWorldApp({
 }
 
 /**
- * Approve and deny are signed in World App by the wallet that claimed the
- * agent. Each signature covers this approval, this exact action, and this
- * decision. Outside World App the page only links there.
+ * Deny is one World App signature. Approve is a World App signature from the
+ * wallet that claimed the agent, then a fresh World ID for Agents check that
+ * the API validates before the action runs. Outside World App the page only
+ * links there.
  */
 export function ApprovalActions({
   approvalId,
   label,
+  worldIdStatus = null,
+  worldIdError = null,
 }: {
   approvalId: string;
   label: string;
+  worldIdStatus?: WorldIdCheckStatus | null;
+  worldIdError?: string | null;
 }) {
   if (!insideWorldApp) {
     return (
       <OpenInWorldApp
         path={`/approve/${approvalId}`}
         label="Decide in World App"
-        detail="The agent's owner approves or denies in World App. A claimed agent's owner gets a push."
+        detail={
+          worldIdStatus === "WAITING"
+            ? "The owner signed Approve and is finishing World ID."
+            : "The agent's owner approves or denies in World App. A claimed agent's owner gets a push."
+        }
       />
     );
   }
-  return <WorldAppDecision approvalId={approvalId} label={label} />;
+  return (
+    <WorldAppDecision
+      approvalId={approvalId}
+      label={label}
+      worldIdStatus={worldIdStatus}
+      worldIdError={worldIdError}
+    />
+  );
 }
 
 function WorldAppDecision({
   approvalId,
   label,
+  worldIdStatus,
+  worldIdError,
 }: {
   approvalId: string;
   label: string;
+  worldIdStatus: WorldIdCheckStatus | null;
+  worldIdError: string | null;
 }) {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState<Decision | null>(null);
+  const [prompt, setPrompt] = useState<WorldIdPrompt | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -230,13 +255,9 @@ function WorldAppDecision({
         setNote("You closed the World App prompt. Nothing changed.");
         return;
       }
-      const result = await decideApproval(approvalId, decision, signed);
+      const outcome = await decideApproval(approvalId, decision, signed);
+      setPrompt(outcome.result === "verify" ? outcome.worldId : null);
       await queryClient.invalidateQueries();
-      await navigate({
-        to: "/approve/$approvalId",
-        params: { approvalId },
-        search: { result },
-      });
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -248,18 +269,34 @@ function WorldAppDecision({
     }
   }
 
+  const verifying = prompt !== null && worldIdStatus === "WAITING";
+  const lastCheckEnded =
+    !verifying && worldIdError && worldIdStatus !== "WAITING";
+
   return (
     <div className="mt-4 grid gap-3">
+      {verifying ? <WorldIdStep prompt={prompt} /> : null}
+      {lastCheckEnded ? (
+        <p role="status" className="text-sm text-block">
+          World ID did not approve: {worldIdError}
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          className="flex-1 rounded-md bg-ink px-4 py-3 text-sm font-medium text-paper disabled:opacity-50"
-          aria-label={`Approve ${label}`}
-          disabled={busy !== null}
-          onClick={() => void decide("approve")}
-        >
-          {busy === "approve" ? "Signing…" : "Approve"}
-        </button>
+        {verifying ? null : (
+          <button
+            type="button"
+            className="flex-1 rounded-md bg-ink px-4 py-3 text-sm font-medium text-paper disabled:opacity-50"
+            aria-label={`Approve ${label}`}
+            disabled={busy !== null}
+            onClick={() => void decide("approve")}
+          >
+            {busy === "approve"
+              ? "Signing…"
+              : worldIdStatus === "WAITING"
+                ? "Continue with World ID"
+                : "Approve with World ID"}
+          </button>
+        )}
         <button
           type="button"
           className="flex-1 rounded-md border border-block px-4 py-3 text-sm font-medium text-block disabled:opacity-50"
@@ -280,6 +317,33 @@ function WorldAppDecision({
           {error}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/** The person checks the code on World ID, proves, and approves or denies there. */
+function WorldIdStep({ prompt }: { prompt: WorldIdPrompt }) {
+  return (
+    <div className="rounded-xl border border-line bg-paper p-4">
+      <p className="text-sm font-medium">Confirm with World ID</p>
+      <p className="mt-1 text-sm text-muted">
+        Open World ID, check that it shows this code, then tap Authenticate with
+        World ID. Tap Deny there to stop the action.
+      </p>
+      <p className="mt-4 font-mono text-3xl font-semibold tracking-widest">
+        {prompt.userCode}
+      </p>
+      <a
+        href={prompt.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-4 block rounded-md bg-ink px-4 py-3 text-center text-sm font-medium text-paper"
+      >
+        Open World ID
+      </a>
+      <p role="status" className="mt-3 text-sm text-muted">
+        Waiting for World ID. This page updates by itself when you come back.
+      </p>
     </div>
   );
 }

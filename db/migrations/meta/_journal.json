@@ -29,6 +29,13 @@
       "when": 1790445000000,
       "tag": "0003_world_app",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790450000000,
+      "tag": "0004_world_id_checks",
+      "breakpoints": true
     }
   ]
 }

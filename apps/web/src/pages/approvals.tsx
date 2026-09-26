@@ -97,7 +97,6 @@ function ApprovalCard({
         <Link
           to="/approve/$approvalId"
           params={{ approvalId: approval.id }}
-          search={{}}
           className="ml-auto text-sm underline"
         >
           Details

@@ -95,8 +95,24 @@ export type ApprovalRequest = {
   /** World App wallet that signed the approve or deny. */
   decidedBy: string | null;
   decidedAt: string | null;
+  /** Latest World ID for Agents check for this approval, if one started. */
+  worldIdStatus: WorldIdCheckStatus | null;
+  /** Why the latest World ID check did not approve, when it failed. */
+  worldIdError: string | null;
   authorization: ScopedAuthorization;
 };
+
+/**
+ * A World ID for Agents device check started by the owner's Approve. Only
+ * VERIFIED lets the action run.
+ */
+export type WorldIdCheckStatus =
+  | "WAITING"
+  | "VERIFIED"
+  | "DENIED"
+  | "EXPIRED"
+  | "FAILED"
+  | "CANCELLED";
 
 /** Swaps stay unsigned. An x402 settlement sets `signed` to true. */
 export type SimulatedExecution = {

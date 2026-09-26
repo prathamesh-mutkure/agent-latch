@@ -72,9 +72,6 @@ const approvalsRoute = createRoute({
 const approveRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/approve/$approvalId",
-  validateSearch: (search: Record<string, unknown>): { result?: string } => ({
-    result: typeof search.result === "string" ? search.result : undefined,
-  }),
   component: ApprovePage,
 });
 

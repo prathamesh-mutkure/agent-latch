@@ -20,6 +20,7 @@ export {
   type Policy,
   type ScopedAuthorization,
   type SimulatedExecution,
+  type WorldIdCheckStatus,
 } from "./types";
 export {
   formatUsdc,

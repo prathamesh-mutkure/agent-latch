@@ -17,11 +17,11 @@ Do not close these in code until he writes the choice in `decisions.md`.
 
 **Signer custody.** The code signs with one `LocalKeySigner` (`EXECUTOR_PRIVATE_KEY`) and an exact EIP-3009 slip, then that same key broadcasts the Sepolia transaction. His spec uses a wallet per agent, encrypted at rest. Either can be the end state. Leave `packages/signers/local` and `packages/executors/x402` in place until he decides.
 
-**World approval shape.** Closed on 2026-09-27 in `decisions.md` ("World App is the only human surface"). Past-policy actions push to the owner's World App. The owner approves or denies there with a wallet signature bound to that action. Whether to add an IDKit proof is open in `open-questions.md`.
+**World approval shape.** Closed on 2026-09-27 in `decisions.md` ("World App is the only human surface", then "World ID for Agents confirms every approve"). Past-policy actions push to the owner's World App. The owner denies with a wallet signature bound to that action, or approves with that signature plus a World ID for Agents device check the API validates.
 
 ## Step order
 
-1. Phases 5 and 8. World App approval on the existing approval path. Leave the signer alone. Built and checked against Postgres. The phone run is in `issues.md`.
+1. Phases 5 and 8. World App approval with a World ID for Agents check on approve, on the existing approval path. Leave the signer alone. Built and checked against Postgres and the live sandbox. The phone run is in `issues.md`.
 2. Custody. No code until the open question is closed.
 3. Done. An action is refused when the ENS name is missing or expired. Registration sets the resolver, the ETH address, and the policy text records. Decisions read those records.
 4. Later: publishing a looser policy after an owner signature in World App. A content hash in place of the plaintext records is post-hackathon.

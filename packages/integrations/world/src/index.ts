@@ -3,6 +3,8 @@ import { verifySiweMessage } from "@worldcoin/minikit-js/siwe";
 import { type Client, createPublicClient, getAddress, http } from "viem";
 import { worldchain } from "viem/chains";
 
+export * from "./world-id";
+
 export type BindingFields = {
   approvalId: string;
   agentId: string;

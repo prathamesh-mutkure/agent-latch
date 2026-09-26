@@ -1,11 +1,13 @@
 import { Elysia } from "elysia";
 import { respond } from "../../result";
+import { worldIdSettings } from "../approvals/world-id";
 import { linkBody, walletParams } from "./schemas";
 import { getOwner, issueNonce, linkWorldApp } from "./service";
 
 export const worldRoutes = new Elysia({ prefix: "/world" })
   .get("/config", () => ({
     appId: process.env.WORLD_APP_ID?.trim() || null,
+    worldIdReady: worldIdSettings() !== null,
   }))
   .get("/nonce", ({ set }) => {
     set.headers["cache-control"] = "no-store";

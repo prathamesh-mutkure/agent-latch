@@ -1,5 +1,6 @@
-import { Link, useParams, useSearch } from "@tanstack/react-router";
+import { Link, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import type { ApprovalRecord } from "../api";
 import { useAgents, useApproval } from "../hooks";
 import { formatDollars } from "../model";
 import {
@@ -13,31 +14,56 @@ import {
 } from "../ui";
 import { insideWorldApp } from "../world";
 
-/** `?result=` values from a signed World App decision. */
-const outcomes: Record<string, { tone: "allow" | "block"; text: string }> = {
-  paid: { tone: "allow", text: "Approved. The payment settled." },
-  approved: { tone: "allow", text: "Approved. The action ran." },
-  denied: { tone: "allow", text: "Denied. Nothing ran." },
-  expired: {
-    tone: "block",
-    text: "The approval expired before you decided. Nothing ran.",
-  },
-  binding: {
-    tone: "block",
-    text: "The action changed after the approval opened. Nothing ran.",
-  },
-  payment_failed: {
-    tone: "block",
-    text: "You approved, but the payment did not settle.",
-  },
-  passport_inactive: {
-    tone: "block",
-    text: "The agent's ENS name is missing or expired. Nothing ran.",
-  },
-  passport_unread: {
-    tone: "block",
-    text: "The agent's ENS name could not be read. Nothing ran and the approval is still open. Try again.",
-  },
+type Outcome = { tone: "allow" | "block"; text: string };
+
+const failures: Record<string, string> = {
+  BINDING: "The action changed after the approval opened. Nothing ran.",
+  PAYMENT_FAILED: "World ID approved, but the payment did not settle.",
+  PASSPORT_INACTIVE: "The agent's ENS name is missing or expired. Nothing ran.",
+};
+
+function outcomeOf(data: ApprovalRecord): Outcome | null {
+  switch (data.status) {
+    case "APPROVED":
+      return {
+        tone: "allow",
+        text:
+          data.action === "X402_PAYMENT"
+            ? "Approved and confirmed with World ID. The payment settled."
+            : "Approved and confirmed with World ID. The action ran.",
+      };
+    case "REJECTED":
+      return {
+        tone: "allow",
+        text:
+          data.worldIdStatus === "DENIED"
+            ? "Denied on World ID. Nothing ran."
+            : "Denied. Nothing ran.",
+      };
+    case "EXPIRED":
+      return {
+        tone: "block",
+        text: "The approval expired before World ID confirmed it. Nothing ran.",
+      };
+    case "FAILED":
+      return {
+        tone: "block",
+        text:
+          (data.failureReason && failures[data.failureReason]) ??
+          "The approval failed. Nothing ran.",
+      };
+    default:
+      return null;
+  }
+}
+
+const worldIdLabels: Record<string, string> = {
+  WAITING: "Waiting for the owner to finish World ID",
+  VERIFIED: "Fresh proof verified by the API",
+  DENIED: "Denied on World ID",
+  EXPIRED: "Expired before anyone approved",
+  FAILED: "Failed",
+  CANCELLED: "Cancelled",
 };
 
 function countdown(iso: string, now: number): string {
@@ -51,7 +77,6 @@ function countdown(iso: string, now: number): string {
 
 export function ApprovePage() {
   const { approvalId } = useParams({ from: "/approve/$approvalId" });
-  const { result } = useSearch({ from: "/approve/$approvalId" });
   const approval = useApproval(approvalId);
   const agents = useAgents();
   const [now, setNow] = useState(Date.now());
@@ -60,8 +85,8 @@ export function ApprovePage() {
     return () => clearInterval(timer);
   }, []);
 
-  const outcome = result ? outcomes[result] : undefined;
   const data = approval.data;
+  const outcome = data ? outcomeOf(data) : null;
   const agent = agents.data?.find((item) => item.id === data?.agentId);
   const label = data ? `${data.action} ${formatDollars(data.amountUsdc)}` : "";
   const unclaimed = Boolean(agent && !agent.userId);
@@ -70,7 +95,7 @@ export function ApprovePage() {
     <>
       <PageHeader
         title="Approve one action"
-        detail="The agent went past its rules. Approve or deny this one action. Your World App signature covers only this action and this decision."
+        detail="The agent went past its rules. Deny, or approve with your World App signature and a fresh World ID check. Nothing runs until the API has validated World ID's answer."
       />
       {outcome ? (
         <p
@@ -112,6 +137,17 @@ export function ApprovePage() {
                 label="Expires"
                 value={new Date(data.expiresAt).toLocaleString()}
               />
+              {data.worldIdStatus ? (
+                <Field
+                  label="World ID for Agents"
+                  value={
+                    data.worldIdError
+                      ? `${worldIdLabels[data.worldIdStatus] ?? data.worldIdStatus}: ${data.worldIdError}`
+                      : (worldIdLabels[data.worldIdStatus] ??
+                        data.worldIdStatus)
+                  }
+                />
+              ) : null}
               {data.decidedBy ? (
                 <Field label="Decided by" value={data.decidedBy} />
               ) : null}
@@ -138,7 +174,12 @@ export function ApprovePage() {
               </div>
             ) : null}
             {data.status === "PENDING" && !unclaimed ? (
-              <ApprovalActions approvalId={data.id} label={label} />
+              <ApprovalActions
+                approvalId={data.id}
+                label={label}
+                worldIdStatus={data.worldIdStatus}
+                worldIdError={data.worldIdError}
+              />
             ) : null}
           </Panel>
         ) : null}

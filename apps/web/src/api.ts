@@ -155,19 +155,29 @@ export async function getDecisionChallenge(
   return data;
 }
 
+/**
+ * Sends the signed decision. Deny ends the approval. Approve returns the World
+ * ID for Agents check to finish; the action runs after World ID verifies it.
+ */
 export async function decideApproval(
   approvalId: string,
   decision: Decision,
   payload: SignedWalletAuth,
-): Promise<string> {
+) {
   const data = await read(
     client.approvals({ approvalId }).decide.post({ decision, payload }),
   );
   if (isErrorBody(data)) {
     throw new Error(data.error);
   }
-  return data.result;
+  return data;
 }
+
+export type DecisionOutcome = Awaited<ReturnType<typeof decideApproval>>;
+export type WorldIdPrompt = Extract<
+  DecisionOutcome,
+  { result: "verify" }
+>["worldId"];
 
 export type AgentRecord = Awaited<ReturnType<typeof listAgents>>[number];
 export type ApprovalRecord = Awaited<ReturnType<typeof listApprovals>>[number];

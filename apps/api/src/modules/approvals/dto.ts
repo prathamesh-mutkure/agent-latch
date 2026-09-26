@@ -2,6 +2,7 @@ import type {
   ActionType,
   ApprovalRequest,
   ApprovalStatus,
+  WorldIdCheckStatus,
 } from "@agentlatch/core";
 import { formatUsdc } from "@agentlatch/core";
 import type { approvals } from "./schema";
@@ -26,6 +27,8 @@ export function toApproval(row: ApprovalRow): ApprovalRequest {
     failureReason: row.failureReason,
     decidedBy: row.decidedBy,
     decidedAt: row.decidedAt?.toISOString() ?? null,
+    worldIdStatus: row.worldIdStatus as WorldIdCheckStatus | null,
+    worldIdError: row.worldIdError,
     authorization: {
       agentId: row.agentId,
       action: row.action as ActionType,
@@ -66,6 +69,8 @@ export type ApprovalDto = {
   failureReason: string | null;
   decidedBy: string | null;
   decidedAt: string | null;
+  worldIdStatus: WorldIdCheckStatus | null;
+  worldIdError: string | null;
   authorization: AuthorizationDto;
 };
 
@@ -87,6 +92,8 @@ export function toApprovalDto(approval: ApprovalRequest): ApprovalDto {
     failureReason: approval.failureReason,
     decidedBy: approval.decidedBy,
     decidedAt: approval.decidedAt,
+    worldIdStatus: approval.worldIdStatus,
+    worldIdError: approval.worldIdError,
     authorization: {
       ...approval.authorization,
       amountUsdc: formatUsdc(approval.authorization.amount),

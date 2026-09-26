@@ -19,7 +19,7 @@ The API applies database migrations on startup. More commands, including how to 
 - API health: http://localhost:3001/health
 - Agent: background process started by `bun run dev`
 
-The API stores agents, policies, actions, approvals, and an audit log in Postgres. `POST /agents/:id/actions` returns allow, block, or an approval id. An approval pushes to the agent's owner in World App. The owner approves or denies there with a wallet signature bound to that one action. The timeline is `GET /agents/:id/audit`. Field details are in `docs/agent/current-state.md`. The World App setup is in [`docs/agent/commands.md`](docs/agent/commands.md).
+The API stores agents, policies, actions, approvals, and an audit log in Postgres. `POST /agents/:id/actions` returns allow, block, or an approval id. An approval pushes to the agent's owner in World App. The owner denies with a wallet signature bound to that one action. To approve, they sign and then complete a fresh World ID for Agents check. The API validates World's token before the action runs. The integration debrief is [`docs/world-id-debrief.md`](docs/world-id-debrief.md). The timeline is `GET /agents/:id/audit`. Field details are in `docs/agent/current-state.md`. The World App setup is in [`docs/agent/commands.md`](docs/agent/commands.md).
 
 ```sh
 bun run typecheck

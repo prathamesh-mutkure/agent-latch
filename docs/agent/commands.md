@@ -99,7 +99,17 @@ ngrok http 3001
 
 Set the Developer Portal mini app URL to that web host. Set `WORLD_APP_ID` and `WORLD_NOTIFICATION_API_KEY` in `.env` for the API. `WORLDCHAIN_RPC_URL` is optional.
 
-On the phone: open the mini app in World App, tap Claim on the agent, sign, and allow notifications. When the agent goes past its rules, the push opens `/approve/<id>`. Tap Approve or Deny and sign. The desktop dashboard shows the same approval with a "Decide in World App" link.
+World ID for Agents needs a confidential client from `https://sandbox.auth.world.org/portal`, registered with an HTTPS callback (device clients still need one) and `client_secret_basic`. Set these for the API only:
+
+```sh
+WORLD_OIDC_ISSUER=https://sandbox.auth.world.org
+WORLD_CLIENT_ID=<portal client id>
+WORLD_CLIENT_SECRET=<from the portal, backend only>
+```
+
+`GET /world/config` returns `worldIdReady: true` when all three are set.
+
+On the phone: open the mini app in World App, tap Claim on the agent, sign, and allow notifications. When the agent goes past its rules, the push opens `/approve/<id>`. Deny: tap Deny and sign. Approve: tap Approve with World ID and sign, then tap Open World ID, check the code, and tap Authenticate with World ID. The action runs once the API has validated World's token. Tapping Deny sign-in on World ID rejects the approval. The desktop dashboard shows the same approval with a "Decide in World App" link.
 
 ## Checks
 

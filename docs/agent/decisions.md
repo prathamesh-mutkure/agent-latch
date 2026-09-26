@@ -208,6 +208,8 @@ Supersedes the server-started ceremony in "World step-up does not auto-approve".
 
 ## 2026-09-27 — World App is the only human surface
 
+Partly superseded by "World ID for Agents confirms every approve" (2026-09-27): the one-product rule, the approve path, and the tradeoff. Claim, link, pushes, the challenge, and deny stand.
+
 Supersedes "World ID for Agents", "Deny needs World ID too", "World App notifications", "World step-up does not auto-approve", and "Step-up uses the signed-in human".
 
 - Why: World is here for one job. When an action is past policy, reach the owner out of band and take their approve or deny. The World ID for Agents sandbox mocks a new person for every ceremony, so the owner never matched (`WRONG_HUMAN`), and its page could approve with no human click.
@@ -222,6 +224,22 @@ Supersedes "World ID for Agents", "Deny needs World ID too", "World App notifica
 - The desktop dashboard does not decide. It links into World App with `MiniKit.getMiniAppUrl`. `/mini` and `/approve/:id` act only inside World App.
 - Kept: the `binding_hash` formula, 5-minute approvals, the passport check before execution, and `FAILED` reasons `BINDING`, `PASSPORT_INACTIVE`, and `PAYMENT_FAILED`. Gone: `WRONG_HUMAN`, `STALE_VERIFICATION`, `WEAK_PROOF`, and `CANCELLED` from the World screen.
 - Tradeoff: a decision proves the wallet, not personhood. The event's World prizes need IDKit or World ID for Agents. See "World ID proof on approve" in `open-questions.md`.
+
+## 2026-09-27 — World ID for Agents confirms every approve
+
+Supersedes the one-product bullet, the approve half of the decide bullet, and the tradeoff bullet in "World App is the only human surface". Closes "World ID proof on approve" in `open-questions.md` with World ID for Agents, not IDKit.
+
+- Why: the ETHGlobal World ID for Agents track requires the official sandbox, the full journey (request, human completion, backend-validated result, protected action), an unsuccessful path where nothing runs, and backend validation. A wallet signature proves the wallet, not a fresh human.
+- Two World products, one job each. World App (MiniKit) is the channel and the owner: claim, pushes, and the wallet signature. World ID for Agents (`https://sandbox.auth.world.org`, RFC 8628 device grant) is the fresh human check on every approve. No IDKit, no `configure_world_id`, no on-chain RP.
+- Device grant, not the browser code flow. The backend starts it with the client secret. No callback, cookie, state, or PKCE. Every attempt needs a fresh proof and an explicit Approve or Deny on World's page, and World's page never auto-approves it.
+- Approve: the owner signs the approve challenge. The API verifies the wallet, the binding, and the ENS passport, then calls `device_authorization` (`scope=openid`, `client_secret_basic`, `openid-client` v6) and stores the attempt in `world_id_checks`. Only the signer gets the approval link and user code in the `decide` response. A second approve returns the check that is still waiting.
+- The API polls the token endpoint in the background, one poller per check. It honours `interval` and `slow_down`, stops at the approval's expiry, and resumes waiting checks on boot.
+- A token counts only if its signature verifies against World's JWKS (`enableNonRepudiationChecks`), `iss`, `aud`, `exp`, and `iat` pass, `acr` is `https://world.org/oidc/acr/orb-v3`, and `auth_time` falls between the check's start − 60 s and now + 60 s. Device ID tokens carry no nonce. The binding is the device code, which never leaves the API and belongs to one approval.
+- Under the approval lock the API rechecks: still pending, the owner's wallet is the signer, the binding hash is the one stored at check start and still recomputes, and the passport. Then the existing settle path runs. `APPROVED` records `decided_by`. The check stores the pairwise `sub` and `auth_time`, backend only.
+- Unsuccessful paths. Deny on World ID sets `REJECTED` (check `DENIED`). Deny in World App sets `REJECTED`, cancels the waiting check, and stops polling. An expired World code, a token that fails validation, a World error, or an unreadable ENS name leaves the approval `PENDING`, and the owner can approve again. An expired approval is `EXPIRED`, and a proof that arrives later runs nothing.
+- The owner is still the wallet, not the World ID `sub`. The sandbox mocks a new person for every proof, so an `(iss, sub)` match fails every time (the old `WRONG_HUMAN`). The `sub` is evidence only. If production subjects are stable, link `(iss, sub)` at claim and require it on approve.
+- Public reads expose `worldIdStatus` and `worldIdError`. The device code, user code, link, and `sub` never appear there.
+- Env on the API only: `WORLD_OIDC_ISSUER`, `WORLD_CLIENT_ID`, `WORLD_CLIENT_SECRET`. Missing values make approve 503. `WORLD_REDIRECT_URI` stays registered in the portal because device clients still need one, but the code does not read it. `COOKIE_SECRET` is unused.
 
 ## How to change a decision
 
