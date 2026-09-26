@@ -326,6 +326,14 @@ Supersedes the 500 USDC autonomous and 5000 hard numbers in "Agent keys".
 - 0.2 allows and broadcasts. 0.5 waits for World approval. 2 blocks. The background agent cycles those three amounts.
 - Existing agents `pilot`, `waifu`, `agent1`, and `agent2` are published to those text records, then stored in Postgres. Actions, USDC, and targets stay as they were.
 
+## 2026-09-27 — Demo merchant catalog, and the agent gets what it paid for
+
+Supersedes "For now it lists AgentLatch's own demo seller" in "MCP server for x402 payments".
+
+- `GET /x402/merchants` lists the 0.01 USDC demo seller and six more from `apps/api/src/modules/x402/merchants.ts`, each at `/x402/shop/<id>`: Omikuji 0.1 (a Japanese shrine fortune), Purr 0.2 (cat fact and ASCII cat), Blob 0.3 (kawaii SVG sticker), Pixel 0.4 (8-bit sprite grid), Lookout 0.5 (live Sepolia block and gas), Oracle 0.6 (snapshot plus fortune, a go or wait call). All pay `X402_PAY_TO` through AgentLatch's facilitator, so nothing about settlement changes.
+- A seller answers `{ paid, txHash, item }`. If the item fails after settlement, it still returns the receipt with `item: null`.
+- `payQuote` keeps the seller's response. It is stored as `actions.result` (jsonb, migration 0008, cut at 16 KB) on a direct payment and after a World approval, and returned by action reads and the MCP payment tools. Under the 0.2 / 1 / 5 demo policy, Omikuji and Purr pay at once and the 0.3 to 0.6 merchants wait for World approval. Before this the body was dropped, so an agent paid and never saw what it bought.
+
 ## How to change a decision
 
 Add a new dated section that names what it supersedes. Leave the old section in place and mark it superseded.

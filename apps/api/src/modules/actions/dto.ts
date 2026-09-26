@@ -26,6 +26,7 @@ export function toAction(row: ActionRow): ActionRequest {
     reasons: row.reasons,
     approvalRequestId: row.approvalRequestId,
     executionId: row.executionId,
+    result: row.result ?? null,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -45,6 +46,8 @@ export type ActionDto = {
   reasons: string[];
   approvalRequestId: string | null;
   execution: SimulatedExecution | null;
+  /** What the paid x402 resource returned. */
+  result: unknown;
   createdAt: string;
 };
 
@@ -66,6 +69,7 @@ export async function toActionDto(action: ActionRequest): Promise<ActionDto> {
     execution: action.executionId
       ? ((await getExecution(action.executionId)) ?? null)
       : null,
+    result: action.result ?? null,
     createdAt: action.createdAt,
   };
 }

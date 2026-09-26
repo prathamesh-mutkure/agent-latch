@@ -159,12 +159,14 @@ export async function submitAction(input: {
   }
 
   let signed = false;
+  let result: unknown = null;
   if (quote && decision.decision === "ALLOW") {
     const settled = await payQuote(quote);
     if (!settled.ok) {
       return settled;
     }
     signed = true;
+    result = settled.value.result;
     decision = {
       decision: "ALLOW",
       reasons: [...decision.reasons, `x402 settled ${settled.value.txHash}`],
@@ -206,6 +208,7 @@ export async function submitAction(input: {
     reasons: decision.reasons,
     approvalRequestId: null,
     executionId: null,
+    result,
     createdAt: now.toISOString(),
   };
 
@@ -224,6 +227,7 @@ export async function submitAction(input: {
       reasons: action.reasons,
       approvalRequestId: null,
       executionId: null,
+      result,
       createdAt: now,
     });
 

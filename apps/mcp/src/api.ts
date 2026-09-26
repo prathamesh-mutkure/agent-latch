@@ -40,6 +40,8 @@ export type Action = {
   decision: "ALLOW" | "BLOCK" | "HUMAN_APPROVAL";
   reasons: string[];
   approvalRequestId: string | null;
+  /** What the paid x402 resource returned. */
+  result: unknown;
   createdAt: string;
 };
 

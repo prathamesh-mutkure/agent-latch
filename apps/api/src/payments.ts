@@ -130,13 +130,29 @@ export async function screenPayee(
   }
 }
 
+const RESULT_LIMIT = 16_000;
+
+/** The seller's response, as JSON when it is JSON. Large bodies are cut. */
+async function paidBody(response: Response): Promise<unknown> {
+  const text = await response.text().catch(() => "");
+  if (text.length > RESULT_LIMIT) {
+    return { truncated: true, text: text.slice(0, RESULT_LIMIT) };
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text || null;
+  }
+}
+
 /**
  * Signs the quote and retries the resource with PAYMENT-SIGNATURE. The
- * seller's facilitator settles. Returns the settlement transaction.
+ * seller's facilitator settles. Returns the settlement transaction and what
+ * the seller served, so the agent can read what it paid for.
  */
 export async function payQuote(
   quote: Quote,
-): Promise<Success<{ txHash: string }> | Failure> {
+): Promise<Success<{ txHash: string; result: unknown }> | Failure> {
   const privateKey = process.env.EXECUTOR_PRIVATE_KEY ?? "";
   if (!privateKey.startsWith("0x")) {
     return {
@@ -174,7 +190,10 @@ export async function payQuote(
         error: `x402 seller refused the payment: ${reason ?? response.status}.`,
       };
     }
-    return { ok: true, value: { txHash: settled.transaction } };
+    return {
+      ok: true,
+      value: { txHash: settled.transaction, result: await paidBody(response) },
+    };
   } catch (error) {
     const message =
       error instanceof X402SettlementError
@@ -192,7 +211,7 @@ export async function settleAuthorizedPayment(input: {
   target: string;
   token: string;
   amount: string;
-}): Promise<Success<{ txHash: string }> | Failure> {
+}): Promise<Success<{ txHash: string; result: unknown }> | Failure> {
   const quote = await quoteResource(input);
   if (!quote.ok) {
     return quote;

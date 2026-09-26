@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -33,6 +34,8 @@ export const actions = pgTable(
     reasons: text("reasons").array().notNull(),
     approvalRequestId: uuid("approval_request_id"),
     executionId: uuid("execution_id").references(() => executions.id),
+    /** What a paid x402 resource returned. Null until it is paid. */
+    result: jsonb("result"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   },
   (table) => [

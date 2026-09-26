@@ -83,6 +83,8 @@ export type ActionRequest = {
   reasons: string[];
   approvalRequestId: string | null;
   executionId: string | null;
+  /** What a paid x402 resource returned, for the agent to read. */
+  result: unknown;
   createdAt: string;
 };
 

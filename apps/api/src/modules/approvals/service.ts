@@ -745,6 +745,7 @@ async function runVerified(
   }
 
   let signed = false;
+  let result: unknown = null;
   if (action.action === "X402_PAYMENT") {
     const settled = await settleAuthorizedPayment({
       target: action.target,
@@ -767,6 +768,7 @@ async function runVerified(
       ...action.reasons,
       `x402 settled ${settled.value.txHash}`,
     ];
+    result = settled.value.result;
   } else if (action.action === "TOKEN_TRANSFER" || action.action === "SWAP") {
     const settled = await broadcastAuthorizedAction({
       action: action.action,
@@ -800,6 +802,7 @@ async function runVerified(
       status: "EXECUTED",
       executionId: execution.id,
       reasons: action.reasons,
+      result,
     })
     .where(eq(actions.id, action.id));
   await recordAudit(tx, {

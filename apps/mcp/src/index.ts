@@ -49,6 +49,8 @@ function payment(action: Action) {
     reasons: action.reasons,
     approvalRequestId: action.approvalRequestId,
     txHash: settled ?? null,
+    /** What the seller served for the payment. */
+    result: action.result ?? null,
     next:
       action.status === "AWAITING_APPROVAL"
         ? "A human must approve this payment in World App. Call get_payment with actionId to follow it."
