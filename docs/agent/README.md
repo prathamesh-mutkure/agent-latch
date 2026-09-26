@@ -12,6 +12,7 @@ Short on purpose. Coding agents load this folder, so keep it current and small.
 | `current-state.md` | Todos with a testing column, plus a testing section and notes. | After every task. Update that row's state and testing column, and the testing section when you verified something. Do not append a diary. |
 | `issues.md` | What is broken or easy to get wrong on the live demo. | A live failure is fixed or a new one shows up. |
 | `commands.md` | Commands to run the apps, the agent, and Postgres. | A run command is added or renamed. |
+| `deploy.md` | Hosted Postgres and the public API. | The host, the env, or the smoke check changes. |
 
 `AGENTS.md` at the repo root points here. Cursor and Codex load it. `CLAUDE.md` imports `AGENTS.md` for Claude Code and should not grow its own rules. Git is the sync channel: the handoff is the commit that updates `current-state.md`.
 

@@ -1,6 +1,6 @@
 # Commands
 
-Run from the repo root.
+Run from the repo root. A public API and hosted Postgres are in [`deploy.md`](deploy.md). The commands below stay on this machine.
 
 ## Local stack
 
@@ -128,6 +128,8 @@ For a local API behind ngrok:
 ngrok http 3001
 # put the https host in apps/web/vercel.json, then redeploy apps/web
 ```
+
+That tunnel is what `apps/web/vercel.json` uses today. [`deploy.md`](deploy.md) replaces it with a stable API host.
 
 Set the Developer Portal mini app URL to that web host. Set `WORLD_APP_ID`, `WORLD_NOTIFICATION_API_KEY`, and `SESSION_SECRET` in `.env` for the API. `WORLDCHAIN_RPC_URL` is optional. Generate the session secret once and keep it, or every API restart signs everyone out:
 
