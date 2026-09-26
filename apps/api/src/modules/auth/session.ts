@@ -23,6 +23,11 @@ export type Attempt = {
   transactionId?: string;
   /** Initiator cookie for that transaction. Stays on the API. */
   initiatorCookie?: string;
+  /** Set after World returns a ticket that matches the owner. Execution waits on a click. */
+  verifiedIss?: string;
+  verifiedSub?: string;
+  verifiedAuthTime?: string;
+  verifiedAcr?: string;
   startedAt: number;
   exp: number;
 };

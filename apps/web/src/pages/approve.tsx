@@ -6,7 +6,7 @@ import {
   useSearch,
 } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { type StepUpStatus, stepUpStatus } from "../api";
+import { confirmStepUp, type StepUpStatus, stepUpStatus } from "../api";
 import { useAgents, useApproval, useMe } from "../hooks";
 import { formatDollars } from "../model";
 import {
@@ -98,17 +98,21 @@ function worldWaitCopy(status: string): string {
   if (status === "verified") {
     return "Confirm the approval on the World ID page. It does not finish from this tab.";
   }
-  return "Open World ID and confirm this decision. Nothing runs until you do.";
+  return "The World ID window uses the account you signed in with. Nothing runs until you confirm on this page.";
 }
 
 function WorldHandoff({
   status,
   error,
   pending,
+  onConfirm,
+  confirming,
 }: {
   status: StepUpStatus | undefined;
   error: unknown;
   pending: boolean;
+  onConfirm: () => void;
+  confirming: boolean;
 }) {
   if (error) {
     return (
@@ -138,19 +142,40 @@ function WorldHandoff({
       </p>
     );
   }
+  if (status.phase === "confirm") {
+    const label =
+      status.decision === "deny" ? "Confirm denial" : "Confirm approval";
+    return (
+      <div className="mt-4 flex flex-col items-start gap-3">
+        <p className="text-sm text-muted" role="status">
+          World ID matches the owner. Confirm here before anything runs.
+        </p>
+        <button
+          type="button"
+          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper disabled:opacity-50"
+          disabled={confirming}
+          onClick={onConfirm}
+        >
+          {confirming ? "Confirming…" : label}
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="mt-4 flex flex-col items-start gap-3">
       <p className="text-sm text-muted" role="status">
         {worldWaitCopy(status.worldStatus)}
       </p>
-      <a
-        href={status.humanUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper"
-      >
-        Open World ID approval
-      </a>
+      {status.humanUrl ? (
+        <a
+          href={status.humanUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper"
+        >
+          Open World ID approval
+        </a>
+      ) : null}
       {status.connectorUri ? (
         <a
           href={status.connectorUri}
@@ -199,7 +224,28 @@ export function ApprovePage() {
   }, [approvalId, navigate, stepUp.data]);
   const agents = useAgents();
   const me = useMe();
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
+  async function confirm() {
+    setConfirmError(null);
+    setConfirming(true);
+    try {
+      const next = await confirmStepUp();
+      await navigate({
+        to: "/approve/$approvalId",
+        params: { approvalId },
+        search: { result: next },
+        replace: true,
+      });
+    } catch (caught) {
+      setConfirmError(
+        caught instanceof Error ? caught.message : "Could not confirm.",
+      );
+    } finally {
+      setConfirming(false);
+    }
+  }
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
@@ -270,11 +316,20 @@ export function ApprovePage() {
               </div>
             ) : null}
             {handoff === "1" && !result && data.status === "PENDING" ? (
-              <WorldHandoff
-                status={stepUp.data}
-                error={stepUp.error}
-                pending={stepUp.isPending}
-              />
+              <>
+                <WorldHandoff
+                  status={stepUp.data}
+                  error={stepUp.error}
+                  pending={stepUp.isPending}
+                  confirming={confirming}
+                  onConfirm={() => void confirm()}
+                />
+                {confirmError ? (
+                  <p role="alert" className="mt-3 text-sm text-block">
+                    {confirmError}
+                  </p>
+                ) : null}
+              </>
             ) : null}
             {data.status === "PENDING" &&
             !(
@@ -282,6 +337,7 @@ export function ApprovePage() {
               !result &&
               (stepUp.isPending ||
                 stepUp.data?.phase === "waiting" ||
+                stepUp.data?.phase === "confirm" ||
                 stepUp.data?.phase === "done")
             ) ? (
               <ApprovalActions approvalId={data.id} label={label} />

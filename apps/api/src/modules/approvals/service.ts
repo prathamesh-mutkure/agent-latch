@@ -45,7 +45,8 @@ export type StepUpResult =
   | "deny_cancelled"
   | "passport_inactive"
   | "passport_unread"
-  | "weak";
+  | "weak"
+  | "pending_confirm";
 
 type ApprovalRow = typeof approvals.$inferSelect;
 
@@ -360,6 +361,8 @@ export async function decideWithWorld(
   identity: WorldIdentity,
   cookieNonce: string,
   decision: StepUpDecision,
+  /** When false, a passing ticket is stored by the caller and nothing runs yet. */
+  commit = true,
 ): Promise<StepUpResult> {
   const now = new Date();
   return db.transaction(async (tx) => {
@@ -413,6 +416,10 @@ export async function decideWithWorld(
           });
           return failureResults[check.reason];
       }
+    }
+
+    if (!commit) {
+      return "pending_confirm";
     }
 
     if (decision === "deny") {

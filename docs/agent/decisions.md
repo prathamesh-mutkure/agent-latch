@@ -187,6 +187,15 @@ Supersedes the step-up redirect in "World ID for Agents" for how the browser rea
 - The API redeems the code only after World reports the transaction `approved`. `verified` is not enough. Sign-in still sends the browser to the authorize URL.
 - A fresh step-up sends `prompt=login` as well as `max_age=0` and the orb `acr_values`. The ticket must carry `acr` `https://world.org/oidc/acr/orb-v3`, or the approval fails `WEAK_PROOF`.
 
+## 2026-09-27 — Step-up uses the signed-in human
+
+Supersedes the server-started ceremony in "World step-up does not auto-approve".
+
+- The sandbox creates a new person for every ceremony the server starts. That ticket is not the owner, so approval failed `WRONG_HUMAN`.
+- The browser that signed in opens the authorize URL. `prompt=login` is not sent, so World can reuse that session. `max_age=0` and the orb `acr` stay.
+- A passing ticket does not run the action. The approval page shows Confirm, and only that click calls `decideWithWorld`.
+- `auth_time` may be up to 30 minutes before the attempt, so the sign-in from this session still counts.
+
 ## How to change a decision
 
 Add a new dated section that names what it supersedes. Leave the old section in place and mark it superseded.

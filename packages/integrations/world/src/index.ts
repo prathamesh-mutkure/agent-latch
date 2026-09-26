@@ -7,6 +7,13 @@ export const ORB_ACR = "https://world.org/oidc/acr/orb-v3";
 /** Allowed clock drift between World and this server when checking `auth_time`. */
 const CLOCK_SKEW_MS = 30_000;
 
+/**
+ * A step-up may reuse the World session from the sign-in that just happened.
+ * The sandbox mints a new person on every forced login, so auth_time can be
+ * a few minutes older than the approval attempt.
+ */
+const SESSION_AUTH_MS = 30 * 60 * 1000;
+
 export type WorldSettings = {
   issuer: string;
   clientId: string;
@@ -97,7 +104,6 @@ export async function buildAuthorizeUrl(
   if (options.fresh) {
     parameters.max_age = "0";
     parameters.acr_values = ORB_ACR;
-    parameters.prompt = "login";
   }
   const url = oidc.buildAuthorizationUrl(config, parameters);
   return { url: url.href, state, nonce, verifier };
@@ -439,7 +445,7 @@ export function checkApprovalTicket(input: {
   const authTime = identity.authTime.getTime();
   if (
     !approval.stepUpStartedAt ||
-    authTime < approval.stepUpStartedAt.getTime() - CLOCK_SKEW_MS ||
+    authTime < approval.stepUpStartedAt.getTime() - SESSION_AUTH_MS ||
     authTime > now.getTime() + CLOCK_SKEW_MS
   ) {
     return { ok: false, reason: "STALE_VERIFICATION" };

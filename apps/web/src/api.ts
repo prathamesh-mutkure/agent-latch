@@ -126,10 +126,11 @@ export type StepUpStatus =
   | { phase: "idle" }
   | {
       phase: "waiting";
-      humanUrl: string;
+      humanUrl?: string;
       connectorUri?: string;
       worldStatus: string;
     }
+  | { phase: "confirm"; decision: "approve" | "deny" }
   | { phase: "done"; result: string };
 
 export async function stepUpStatus(): Promise<StepUpStatus> {
@@ -141,11 +142,23 @@ export async function stepUpStatus(): Promise<StepUpStatus> {
   if (
     body.phase !== "idle" &&
     body.phase !== "waiting" &&
+    body.phase !== "confirm" &&
     body.phase !== "done"
   ) {
     throw new Error("World ID status was not recognized.");
   }
   return body;
+}
+
+export async function confirmStepUp(): Promise<string> {
+  const response = await apiFetch("/auth/world/step-up/confirm", {
+    method: "POST",
+  });
+  const body = (await response.json()) as { result?: string; error?: string };
+  if (!response.ok || !body.result) {
+    throw new Error(body.error ?? "Could not confirm the World ID decision.");
+  }
+  return body.result;
 }
 
 export async function getMe() {

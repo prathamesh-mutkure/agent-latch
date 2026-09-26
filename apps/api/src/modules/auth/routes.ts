@@ -1,8 +1,5 @@
 import {
-  beginStepUp,
   buildAuthorizeUrl,
-  completeStepUp,
-  readStepUp,
   redeemCode,
   sameSecret,
   stepUpNonce,
@@ -61,9 +58,6 @@ function approvePage(approvalId: string, result: StepUpResult | string) {
 function handoffPage(approvalId: string) {
   return `/approve/${approvalId}?handoff=1`;
 }
-
-/** One finish at a time per World transaction, so two polls cannot redeem one code. */
-const finishing = new Set<string>();
 
 function refusalResult(status: number): string {
   if (status === 403) {
@@ -130,13 +124,13 @@ export const authRoutes = new Elysia()
       if (!started.ok) {
         return finish(refusalResult(started.status));
       }
-      // The ID token must carry this nonce, so the ticket fits this one
-      // decision on this one action. The browser is sent to World's human
-      // page, not the authorize URL, so it is not the initiator.
-      let handoff: Awaited<ReturnType<typeof beginStepUp>>;
+      // The browser must open this URL itself. A ceremony started on the
+      // server is a different sandbox person and fails WRONG_HUMAN.
+      let authorize: Awaited<ReturnType<typeof buildAuthorizeUrl>>;
       try {
-        handoff = await beginStepUp(settings, {
+        authorize = await buildAuthorizeUrl(settings, {
           nonce: stepUpNonce(started.value.bindingHash, query.decision),
+          fresh: true,
         });
       } catch (error) {
         console.log(
@@ -147,13 +141,11 @@ export const authRoutes = new Elysia()
       const now = Date.now();
       const attempt = sealCookie({
         kind: "step-up",
-        state: handoff.state,
-        nonce: handoff.nonce,
-        verifier: handoff.verifier,
+        state: authorize.state,
+        nonce: authorize.nonce,
+        verifier: authorize.verifier,
         approvalId: query.approval,
         decision: query.decision,
-        transactionId: handoff.transactionId,
-        initiatorCookie: handoff.initiatorCookie,
         startedAt: now,
         exp: Math.floor(now / 1000) + ATTEMPT_TTL_S,
       } satisfies Attempt);
@@ -163,16 +155,15 @@ export const authRoutes = new Elysia()
         maxAge: ATTEMPT_TTL_S,
       });
       if (wantsJson) {
-        return { humanUrl: handoff.humanUrl };
+        return { humanUrl: authorize.url };
       }
-      return redirect(handoffPage(query.approval), 302);
+      return redirect(authorize.url, 302);
     },
     { query: stepUpQuery },
   )
   .get("/auth/world/step-up/status", async ({ cookie, set, userId }) => {
     set.headers["cache-control"] = "no-store";
-    const settings = worldSettings();
-    if (!settings) {
+    if (!worldSettings()) {
       set.status = 503;
       return { error: NOT_CONFIGURED };
     }
@@ -181,79 +172,53 @@ export const authRoutes = new Elysia()
       return { error: "Sign in with World ID first." };
     }
     const attempt = openCookie<Attempt>(cookie[ATTEMPT_COOKIE]?.value);
+    if (attempt?.kind !== "step-up" || !attempt.approvalId) {
+      return { phase: "idle" as const };
+    }
+    if (
+      attempt.verifiedIss &&
+      attempt.verifiedSub &&
+      attempt.verifiedAuthTime
+    ) {
+      return {
+        phase: "confirm" as const,
+        decision: attempt.decision ?? "approve",
+      };
+    }
+    return { phase: "waiting" as const, worldStatus: "browser" };
+  })
+  .post("/auth/world/step-up/confirm", async ({ cookie, set, userId }) => {
+    if (!userId) {
+      set.status = 401;
+      return { error: "Sign in with World ID first." };
+    }
+    const attempt = openCookie<Attempt>(cookie[ATTEMPT_COOKIE]?.value);
+    clearCookie(cookie[ATTEMPT_COOKIE]);
     if (
       attempt?.kind !== "step-up" ||
       !attempt.approvalId ||
-      !attempt.transactionId ||
-      !attempt.initiatorCookie
+      !attempt.verifiedIss ||
+      !attempt.verifiedSub ||
+      !attempt.verifiedAuthTime
     ) {
-      return { phase: "idle" as const };
+      set.status = 400;
+      return { error: "World ID has not finished. Start the approval again." };
     }
-    const humanUrl = new URL(
-      `/authorize?transaction_id=${attempt.transactionId}`,
-      settings.issuer,
-    ).href;
-    const view = await readStepUp(settings, {
-      transactionId: attempt.transactionId,
-      initiatorCookie: attempt.initiatorCookie,
-    });
-    if (view.status === "rejected") {
-      clearCookie(cookie[ATTEMPT_COOKIE]);
-      const result = await cancelStepUp(
-        attempt.approvalId,
-        userId,
-        attempt.decision ?? "approve",
-      );
-      return { phase: "done" as const, result };
+    const result = await decideWithWorld(
+      attempt.approvalId,
+      {
+        iss: attempt.verifiedIss,
+        sub: attempt.verifiedSub,
+        authTime: new Date(attempt.verifiedAuthTime),
+        acr: attempt.verifiedAcr,
+      },
+      attempt.nonce,
+      attempt.decision ?? "approve",
+    );
+    if (result === "paid" || result === "approved" || result === "denied") {
+      await notifyDecision(attempt.approvalId, result);
     }
-    if (
-      view.status === "expired" ||
-      view.status === "failed" ||
-      view.status === "world_id_3_not_available"
-    ) {
-      clearCookie(cookie[ATTEMPT_COOKIE]);
-      return { phase: "done" as const, result: "world_closed" };
-    }
-    if (view.status !== "approved" || finishing.has(attempt.transactionId)) {
-      return {
-        phase: "waiting" as const,
-        humanUrl,
-        connectorUri: view.connectorUri,
-        worldStatus: view.status,
-      };
-    }
-    finishing.add(attempt.transactionId);
-    try {
-      let identity: Awaited<ReturnType<typeof completeStepUp>>;
-      try {
-        identity = await completeStepUp(settings, {
-          transactionId: attempt.transactionId,
-          initiatorCookie: attempt.initiatorCookie,
-          state: attempt.state,
-          nonce: attempt.nonce,
-          verifier: attempt.verifier,
-        });
-      } catch (error) {
-        console.log(
-          `world step-up finish rejected: ${error instanceof Error ? error.message : "error"}`,
-        );
-        clearCookie(cookie[ATTEMPT_COOKIE]);
-        return { phase: "done" as const, result: "invalid_ticket" };
-      }
-      clearCookie(cookie[ATTEMPT_COOKIE]);
-      const result = await decideWithWorld(
-        attempt.approvalId,
-        identity,
-        attempt.nonce,
-        attempt.decision ?? "approve",
-      );
-      if (result === "paid" || result === "approved" || result === "denied") {
-        await notifyDecision(attempt.approvalId, result);
-      }
-      return { phase: "done" as const, result };
-    } finally {
-      finishing.delete(attempt.transactionId);
-    }
+    return { result };
   })
   .get(
     "/auth/world/callback",
@@ -323,11 +288,31 @@ export const authRoutes = new Elysia()
         identity,
         attempt.nonce,
         attempt.decision ?? "approve",
+        false,
       );
-      if (result === "paid" || result === "approved" || result === "denied") {
-        await notifyDecision(attempt.approvalId, result);
+      if (result !== "pending_confirm") {
+        return back(result);
       }
-      return back(result);
+      cookie[ATTEMPT_COOKIE]?.set({
+        value:
+          sealCookie({
+            kind: "step-up",
+            decision: attempt.decision,
+            state: attempt.state,
+            nonce: attempt.nonce,
+            verifier: attempt.verifier,
+            approvalId: attempt.approvalId,
+            verifiedIss: identity.iss,
+            verifiedSub: identity.sub,
+            verifiedAuthTime: identity.authTime.toISOString(),
+            verifiedAcr: identity.acr,
+            startedAt: attempt.startedAt,
+            exp: attempt.exp,
+          } satisfies Attempt) ?? "",
+        ...cookieDefaults,
+        maxAge: ATTEMPT_TTL_S,
+      });
+      return redirect(handoffPage(attempt.approvalId), 302);
     },
   )
   .get("/auth/world/app", () => ({
