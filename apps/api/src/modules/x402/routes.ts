@@ -87,7 +87,8 @@ async function callFacilitator<T>(
   }
 }
 
-const DESCRIPTION = "DSAP paid resource. 0.01 USDC on Ethereum Sepolia.";
+const DESCRIPTION =
+  "Delegated Spend Authorization Protocol paid resource. 0.01 USDC on Ethereum Sepolia.";
 
 function quote(
   url: string,
@@ -211,7 +212,7 @@ export const x402Routes = new Elysia()
         origin,
         {
           id: "dsap-demo",
-          name: "DSAP demo seller",
+          name: "Delegated Spend Authorization Protocol demo seller",
           description: DESCRIPTION,
           path: "/x402/resource",
         },

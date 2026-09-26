@@ -232,7 +232,7 @@ function MiniApproval() {
         ) : null}
       </QueryGate>
       <Link to="/mini" className="mt-6 inline-block text-sm underline">
-        Back to DSAP
+        Back to home
       </Link>
     </>
   );

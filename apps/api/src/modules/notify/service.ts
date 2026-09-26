@@ -41,7 +41,7 @@ export async function notifyApproval(input: {
       appId,
       apiKey,
       wallet: owner.wallet,
-      title: "DSAP approval needed",
+      title: "Approval needed",
       message: `${owner.name} wants to ${input.action} ${formatUsdc(input.amount)} USDC. Tap to approve or deny.`,
       path: `/approve/${input.approvalId}`,
     });

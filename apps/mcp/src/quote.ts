@@ -16,7 +16,7 @@ export type Quote = {
 
 /**
  * Reads a resource's x402 price without paying. Only exact Circle USDC on
- * Ethereum Sepolia can be paid through DSAP.
+ * Ethereum Sepolia can be paid through Delegated Spend Authorization Protocol.
  */
 export async function quote(url: string): Promise<Quote> {
   const parsed = new URL(url);

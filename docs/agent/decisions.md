@@ -349,6 +349,12 @@ Supersedes the ngrok fetch header in "World App is the only human surface".
 - On a computer that route shows the approval's status and a QR code that opens it in World App. Dashboard approval cards link there ("Decide on your phone").
 - Inside World App the dashboard routes redirect to `/mini`. World App gets `/mini`, `/approve/:id`, and `/pair/:code`.
 
+## 2026-09-27 — The product is named Delegated Spend Authorization Protocol
+
+- User-facing text uses the full name: the page title, the brand on the sign-in page and sidebar, the World App sign-in and pairing text, the x402 demo seller, and the MCP tool descriptions. "DSAP" is no longer shown.
+- Unchanged identifiers: the MCP server id `dsap`, the `@agentlatch/*` packages, the `agent-latch.eth` ENS parent, and the `dsapprotocol.xyz` and `dsap-protocol.onrender.com` hosts.
+- The World App push title is "Approval needed", because push titles are short.
+
 ## How to change a decision
 
 Add a new dated section that names what it supersedes. Leave the old section in place and mark it superseded.

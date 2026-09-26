@@ -65,14 +65,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       signal: AbortSignal.timeout(120_000),
     });
   } catch {
-    throw new ApiError(`DSAP API at ${apiUrl} did not answer.`);
+    throw new ApiError(
+      `Delegated Spend Authorization Protocol API at ${apiUrl} did not answer.`,
+    );
   }
   if (!response.ok) {
     const body = (await response.json().catch(() => undefined)) as
       | { error?: string }
       | undefined;
     throw new ApiError(
-      body?.error ?? `DSAP API answered ${response.status}.`,
+      body?.error ??
+        `Delegated Spend Authorization Protocol API answered ${response.status}.`,
     );
   }
   return response.json() as Promise<T>;

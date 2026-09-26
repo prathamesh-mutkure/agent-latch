@@ -43,6 +43,10 @@ function ConsoleShell() {
   // A pushed approval link opens without a session. Deciding still needs World App.
   const open = pathname.startsWith("/approve/");
 
+  if (!session && !open) {
+    return <SignInPage />;
+  }
+
   return (
     <div className="min-h-screen bg-paper text-ink md:grid md:grid-cols-[220px_1fr]">
       <aside className="flex flex-col border-b border-line bg-ink text-paper md:min-h-screen md:border-r md:border-b-0">
@@ -55,13 +59,10 @@ function ConsoleShell() {
               height={36}
               className="size-9 rounded-lg"
             />
-            <span>
-              <span className="block text-base font-semibold tracking-tight">
-                DSAP
-              </span>
-              <span className="mt-0.5 block text-xs leading-snug text-paper/60">
-                Delegated Spend Authorization Protocol
-              </span>
+            <span className="text-sm leading-snug font-semibold tracking-tight">
+              Delegated Spend
+              <br />
+              Authorization Protocol
             </span>
           </Link>
         </div>
@@ -108,7 +109,7 @@ function ConsoleShell() {
         </div>
       </aside>
       <main className="mx-auto w-full max-w-5xl px-6 py-8 md:px-10 md:py-10">
-        {session || open ? <Outlet /> : <SignInPage />}
+        <Outlet />
       </main>
     </div>
   );

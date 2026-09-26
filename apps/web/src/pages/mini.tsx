@@ -25,11 +25,12 @@ function OutsideWorldApp() {
     <>
       <PageHeader
         title="World App"
-        detail="When one of your agents goes past its rules, DSAP pushes the approval to you in World App. You approve or deny there."
+        detail="When one of your agents goes past its rules, the approval is pushed to you in World App. You approve or deny there."
       />
       <Panel>
         <p className="text-sm text-muted">
-          Open DSAP in World App to turn on notifications and decide approvals.
+          Open this page in World App to turn on notifications and decide
+          approvals.
         </p>
         <OpenInWorldApp path="/mini" label="Open in World App" />
       </Panel>
@@ -70,7 +71,7 @@ function WorldAppHome() {
       const signed = await signInWorldApp({
         nonce,
         statement:
-          "Sign in to DSAP. Approvals for your agents come to this World App.",
+          "Sign in to Delegated Spend Authorization Protocol. Approvals for your agents come to this World App.",
         requestId: LINK_REQUEST_ID,
         expirationTime: new Date(Date.now() + SIGN_IN_TTL_MS).toISOString(),
       });
@@ -94,7 +95,7 @@ function WorldAppHome() {
   return (
     <>
       <PageHeader
-        title="DSAP"
+        title="Delegated Spend Authorization Protocol"
         detail="Your agents run on their own inside their rules. Anything past the rules waits here for you."
       />
       {error ? (
@@ -114,8 +115,8 @@ function WorldAppHome() {
       ) : (
         <Panel title="Sign in">
           <p className="text-sm text-muted">
-            Your World App wallet is your DSAP account. The first sign-in
-            creates it. Approvals for your agents then come to this phone.
+            Your World App wallet is your account. The first sign-in creates it.
+            Approvals for your agents then come to this phone.
           </p>
           <button
             type="button"
@@ -176,7 +177,7 @@ function SignedInHome({
           </p>
         ) : notifications === "blocked" ? (
           <p className="text-sm text-muted">
-            Off. Turn on notifications for DSAP in World App settings, then
+            Off. Turn on notifications for this app in World App settings, then
             reopen this page.
           </p>
         ) : (

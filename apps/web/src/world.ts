@@ -31,7 +31,7 @@ export async function signInWorldApp(input: {
   expirationTime?: string;
 }): Promise<SignedWalletAuth | null> {
   if (!insideWorldApp) {
-    throw new Error("Open DSAP in World App to sign.");
+    throw new Error("Open this page in World App to sign.");
   }
   try {
     const result = await MiniKit.walletAuth({

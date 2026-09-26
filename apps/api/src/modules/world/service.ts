@@ -134,7 +134,7 @@ export function startPairing(now = Date.now()) {
 }
 
 function pairingStatement(code: string): string {
-  return `Sign in to DSAP on the computer showing ${code.slice(0, 4)}-${code.slice(4)}.`;
+  return `Sign in to Delegated Spend Authorization Protocol on the computer showing ${code.slice(0, 4)}-${code.slice(4)}.`;
 }
 
 /** What World App signs to sign the computer in. Passed to `MiniKit.walletAuth` as is. */
