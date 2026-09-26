@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://unpractical-unnoteworthy-mariah.ngrok-free.dev/$1"
+      "destination": "https://dsap-protocol.onrender.com/$1"
     },
     { "source": "/(.*)", "destination": "/index.html" }
   ]

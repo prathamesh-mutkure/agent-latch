@@ -7,7 +7,7 @@ Handoff for the next agent. Settled choices stay in `decisions.md`. Do not relit
 ## What is actually running
 
 - Web: `https://www.dsapprotocol.xyz` on Vercel (`apps/web`). Apex 308s to `www`. The live bundle is the old OIDC build until `apps/web` is deployed again.
-- API: local `localhost:3001`, reached through the ngrok host in `apps/web/vercel.json` by the `/api` rewrite. World never calls the API. World App opens the web app, and the web app calls `/api`.
+- API: `https://dsap-protocol.onrender.com` (Render Free, sleeps after 15 minutes with no requests). `apps/web/vercel.json` rewrites `/api` there. Redeploy `apps/web` or the live site still uses the old ngrok rewrite. World never calls the API. World App opens the web app, and the web app calls `/api`.
 - World App: the mini app `app_e84b1b772fa55ee5b4e8a367f169c345` (DSAP Protocol Tokyo), URL `https://www.dsapprotocol.xyz`. It handles sign-in (on the phone, and for the computer through the QR code), pushes, and the owner's signature.
 - World ID for Agents: the sandbox client in `.env` (`WORLD_CLIENT_ID`, issuer `https://sandbox.auth.world.org`, `client_secret_basic`, shown on World's page as "DSAP Protocol"). The API uses only the device grant. World never calls the API. The API polls World.
 - Current agent: `pilot`, id `8b6b1878-eb41-4c5d-9ec3-14bd08eeb074`, ENS `pilot.agent-latch.eth` registered. Owned by World App wallet `0xe5f5617c6996cd0f1b6afe02856f23f46296ad5c`. Only that wallet sees it after signing in. The background agent acts for it through `AGENT_ID` in `.env`.
@@ -39,7 +39,7 @@ Handoff for the next agent. Settled choices stay in `decisions.md`. Do not relit
 
 9. **Approvals last 5 minutes.** The signed message and the World ID check both end with the approval. A late signature is refused, and a World ID approval after expiry runs nothing. Use the newest pending approval.
 
-10. **The ngrok host changes when the free tunnel restarts.** Update `apps/web/vercel.json` and redeploy. A fixed tunnel or a deployed API removes this.
+10. **The live site still uses the old ngrok rewrite until `apps/web` is deployed again.** The repo rewrite points at `https://dsap-protocol.onrender.com`. Render Free sleeps after 15 minutes with no requests, which drops a sign-in in progress.
 
 11. **SIWE domain is not pinned.** MiniKit's verifier checks nonce, statement, request ID, and expiry, not the domain. The statement names the action, so the owner sees what they sign. Pin the domain later.
 
