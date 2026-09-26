@@ -33,6 +33,9 @@ export {
   type WorldIdCheckStatus,
 } from "./types";
 export {
+  DEFAULT_AUTONOMOUS_LIMIT,
+  DEFAULT_DAILY_LIMIT,
+  DEFAULT_HARD_LIMIT,
   formatUsdc,
   parseUsdc,
   SEPOLIA_CHAIN_ID,

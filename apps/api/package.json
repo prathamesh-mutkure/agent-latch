@@ -18,6 +18,8 @@
     "@agentlatch/ens": "workspace:*",
     "@agentlatch/intercepta": "workspace:*",
     "@agentlatch/signer-local": "workspace:*",
+    "@agentlatch/transfer-executor": "workspace:*",
+    "@agentlatch/uniswap-executor": "workspace:*",
     "@agentlatch/world": "workspace:*",
     "@agentlatch/x402": "workspace:*",
     "@agentlatch/x402-executor": "workspace:*",

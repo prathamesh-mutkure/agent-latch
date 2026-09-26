@@ -1,6 +1,6 @@
 # World ID for Agents: integration debrief
 
-AgentLatch puts a human in front of an agent's out-of-policy actions. When an agent asks for more than its rules allow, for example a 2500 USDC swap over a 500 autonomous limit, the action waits. The owner gets a World App push. Nothing runs until they sign Approve and complete a fresh World ID for Agents check, and our API has validated the result.
+AgentLatch puts a human in front of an agent's out-of-policy actions. When an agent asks for more than its rules allow, for example a 0.5 USDC swap over a 0.2 autonomous limit, the action waits. The owner gets a World App push. Nothing runs until they sign Approve and complete a fresh World ID for Agents check, and our API has validated the result.
 
 ## The journey
 

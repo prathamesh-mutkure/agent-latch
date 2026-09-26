@@ -21,6 +21,7 @@ import {
   worldIdError,
 } from "@agentlatch/world";
 import { and, asc, desc, eq } from "drizzle-orm";
+import { broadcastAuthorizedAction } from "../../broadcast";
 import type { Db, Tx } from "../../db/client";
 import { db } from "../../db/client";
 import { saveExecution } from "../../executor";
@@ -743,8 +744,8 @@ async function runVerified(
     return;
   }
 
-  const paid = action.action === "X402_PAYMENT";
-  if (paid) {
+  let signed = false;
+  if (action.action === "X402_PAYMENT") {
     const settled = await settleAuthorizedPayment({
       target: action.target,
       token: action.token,
@@ -761,13 +762,34 @@ async function runVerified(
       });
       return;
     }
+    signed = true;
     action.reasons = [
       ...action.reasons,
       `x402 settled ${settled.value.txHash}`,
     ];
+  } else if (action.action === "TOKEN_TRANSFER" || action.action === "SWAP") {
+    const settled = await broadcastAuthorizedAction({
+      action: action.action,
+      target: action.target,
+      token: action.token,
+      amount: action.amount,
+    });
+    if (!settled.ok) {
+      await closeApproval(tx, loaded, {
+        status: "FAILED",
+        kind: "FAILED",
+        summary: `Settlement failed after World ID approval: ${settled.error}`,
+        failureReason: "PAYMENT_FAILED",
+        decidedBy: check.wallet,
+        now,
+      });
+      return;
+    }
+    signed = true;
+    action.reasons = [...action.reasons, settled.value.detail];
   }
 
-  const execution = await saveExecution(tx, action.id, now, paid);
+  const execution = await saveExecution(tx, action.id, now, signed);
   await tx
     .update(approvals)
     .set({ status: "APPROVED", decidedBy: check.wallet, decidedAt: now })

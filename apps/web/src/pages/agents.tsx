@@ -1,4 +1,10 @@
-import { type ActionType, actionTypes } from "@agentlatch/core";
+import {
+  type ActionType,
+  actionTypes,
+  DEFAULT_AUTONOMOUS_LIMIT,
+  DEFAULT_DAILY_LIMIT,
+  DEFAULT_HARD_LIMIT,
+} from "@agentlatch/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
@@ -129,9 +135,9 @@ function RegisterAgent() {
   const [username, setUsernameInput] = useState("");
   const [name, setName] = useState("");
   const [authAddress, setAuthAddress] = useState("");
-  const [autonomous, setAutonomous] = useState("500");
-  const [hard, setHard] = useState("5000");
-  const [daily, setDaily] = useState("");
+  const [autonomous, setAutonomous] = useState(DEFAULT_AUTONOMOUS_LIMIT);
+  const [hard, setHard] = useState(DEFAULT_HARD_LIMIT);
+  const [daily, setDaily] = useState(DEFAULT_DAILY_LIMIT);
   const [allowedActions, setAllowedActions] = useState<ActionType[]>([
     ...actionTypes,
   ]);

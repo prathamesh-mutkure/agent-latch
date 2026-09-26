@@ -52,7 +52,7 @@ export function localKeySigner(input: {
         timeout: 60_000,
       });
       if (receipt.status !== "success") {
-        throw new Error("x402 settlement transaction reverted.");
+        throw new Error("Sepolia transaction reverted.");
       }
       return hash;
     },

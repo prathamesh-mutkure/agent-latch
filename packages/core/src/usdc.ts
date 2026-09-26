@@ -3,6 +3,11 @@ export const USDC_DECIMALS = 6;
 export const USDC_SEPOLIA_ADDRESS =
   "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
 
+/** Starting policy for a new agent, as a human USDC amount. */
+export const DEFAULT_AUTONOMOUS_LIMIT = "0.2";
+export const DEFAULT_HARD_LIMIT = "1";
+export const DEFAULT_DAILY_LIMIT = "5";
+
 const SCALE = 10n ** BigInt(USDC_DECIMALS);
 
 export class UsdcAmountError extends Error {

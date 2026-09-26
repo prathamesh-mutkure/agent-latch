@@ -33,7 +33,12 @@ function refuse(error: unknown): ToolResult {
 /** What an agent needs from an action: the decision, and the transaction once paid. */
 function payment(action: Action) {
   const settled = action.reasons
-    .map((reason) => /^x402 settled (0x[0-9a-fA-F]{64})$/.exec(reason)?.[1])
+    .map(
+      (reason) =>
+        /^(?:x402 settled|usdc transfer|uniswap swap) (0x[0-9a-fA-F]{64})$/.exec(
+          reason,
+        )?.[1],
+    )
     .find(Boolean);
   return {
     actionId: action.id,
@@ -164,9 +169,9 @@ server.registerTool(
   {
     title: "Request a swap",
     description:
-      "Asks AgentLatch to swap USDC. The agent's ENS policy decides: it runs now, waits for a human in World App, or blocks.",
+      "Asks AgentLatch to swap USDC to Sepolia WETH. The agent's ENS policy decides: it runs now, waits for a human in World App, or blocks.",
     inputSchema: {
-      amountUsdc: z.string().describe("USDC amount, for example 100 or 2500."),
+      amountUsdc: z.string().describe("USDC amount, for example 0.2 or 0.5."),
       note: z.string().optional().describe("Why the agent is swapping."),
     },
     annotations: { destructiveHint: true },

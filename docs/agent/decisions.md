@@ -283,7 +283,7 @@ Supersedes, in "World App is the only human surface": "no sessions", the link an
 Supersedes the open action routes in "Owner accounts" and the "no agent keys yet" sentence in "MCP server for x402 payments". Step 2 of the multi-user plan in `continuation.md`.
 
 - Why: anyone who knew an agent id could submit an action for it. The agent now has its own key, separate from the owner's sign-in.
-- `POST /agents` creates the agent, stores only the SHA-256 of a new key, and returns the key once (`alk_` plus 32 random bytes). It also saves the demo policy, 500 USDC autonomous and 5000 hard. The register button then calls `POST /agents/:id/ens`, which spends Sepolia gas. `POST /agents/:id/key` replaces the key and returns the new one once. The old key stops working. The key is never logged or stored.
+- `POST /agents` creates the agent, stores only the SHA-256 of a new key, and returns the key once (`alk_` plus 32 random bytes). It also saves the demo policy, 500 USDC autonomous and 5000 hard. Superseded by "Demo policy is 0.2 / 1 / 5 USDC" below. The register button then calls `POST /agents/:id/ens`, which spends Sepolia gas. `POST /agents/:id/key` replaces the key and returns the new one once. The old key stops working. The key is never logged or stored.
 - The agent and `apps/mcp` send it as `x-agent-key`. The owner's bearer token stays `Authorization`. `AGENT_KEY` in `.env` is what the background agent and the MCP server send.
 - `POST /agents/:id/actions` requires the key. The owner's session is not enough.
 - `GET /agents/:id/actions`, `GET /actions/:id`, `GET /agents/:id/policy`, and `GET /agents/:id/audit` accept the key or the owner's session. Another owner's session is 404.
@@ -307,6 +307,24 @@ Builds on "Agent keys". Supersedes nothing there: the agent key stays required.
 - Why: registering takes one to two minutes of Sepolia transactions, and more for a new username. Vercel's rewrite to the API gave up first (`ROUTER_EXTERNAL_TARGET_ERROR`), so the page never learned the result.
 - `POST /agents/:id/ens` answers 202 with `{ state: "REGISTERING" }` and runs the job on the API. Agent reads carry `registration`: `REGISTERING`, `FAILED` with the error, or null once done. A second call while one runs returns the same job. A failed job can be started again from the agent's page.
 - Jobs run one at a time because they share the executor key and its nonce. The state is in API memory, so a restart forgets a running job. Registering again resumes from what is already on chain.
+
+## 2026-09-27 — USDC transfers and one Uniswap swap settle on Sepolia
+
+Supersedes the note that swaps stay unsigned. Does not change x402, Intercepta, or signer custody.
+
+- `TOKEN_TRANSFER` broadcasts Circle USDC `transfer` from the one executor key to `target` on Ethereum Sepolia. `target` must be an Ethereum address. Any other target is refused. The action is marked executed only after the transaction lands. The hash is stored on the action as `usdc transfer <hash>`, and the execution row is `signed`.
+- `SWAP` is one swap, USDC to Sepolia WETH, through Uniswap V3 SwapRouter02 `0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E`. The output token is WETH `0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14`. The pool fee is 100 (0.01%), the USDC/WETH fee tier with the best quote on the Sepolia factory. QuoterV2 is `0xEd1f6473345F45b75F8179591dd5bA1888cf2FB3`. The minimum output is 95% of that quote. There is no price oracle and no calldata field. `target` must be that WETH address. `0xvenue` is refused. WETH is sent to the executor address. When the router allowance is short, the key approves the swap amount first; the stored hash is the swap, `uniswap swap <hash>`.
+- A chain error is returned and the action is not marked executed. Nothing is broadcast on `BLOCK`, or on a denied or expired approval. A settled approval broadcasts once. A second decision stays 409.
+- `API_CALL` and `CONTRACT_CALL` stay policy decisions. They are marked executed with `signed` false. Nothing is broadcast. The action schema has no calldata and no URL for them.
+- Intercepta stays on `X402_PAYMENT` only. The signer stays one `LocalKeySigner`.
+
+## 2026-09-27 — Demo policy is 0.2 / 1 / 5 USDC
+
+Supersedes the 500 USDC autonomous and 5000 hard numbers in "Agent keys".
+
+- A new agent starts at 0.2 USDC autonomous, 1 USDC hard, and a 5 USDC daily cap. The same numbers are the form defaults and `POST /agents` when no policy is sent.
+- 0.2 allows and broadcasts. 0.5 waits for World approval. 2 blocks. The background agent cycles those three amounts.
+- Existing agents `pilot`, `waifu`, `agent1`, and `agent2` are published to those text records, then stored in Postgres. Actions, USDC, and targets stay as they were.
 
 ## How to change a decision
 

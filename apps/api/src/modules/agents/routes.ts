@@ -1,3 +1,8 @@
+import {
+  DEFAULT_AUTONOMOUS_LIMIT,
+  DEFAULT_DAILY_LIMIT,
+  DEFAULT_HARD_LIMIT,
+} from "@agentlatch/core";
 import { Elysia, t } from "elysia";
 import { readAgentAccess } from "../../agent-key";
 import { respond } from "../../result";
@@ -44,7 +49,11 @@ export const agentsRoutes = new Elysia({ prefix: "/agents" })
       const policy = await setPolicy(
         created.value.agent.id,
         owner.userId,
-        body.policy ?? { autonomousLimit: "500", hardLimit: "5000" },
+        body.policy ?? {
+          autonomousLimit: DEFAULT_AUTONOMOUS_LIMIT,
+          hardLimit: DEFAULT_HARD_LIMIT,
+          dailyLimit: DEFAULT_DAILY_LIMIT,
+        },
       );
       return {
         ...(await agentWithEns(created.value.agent)),

@@ -6,6 +6,7 @@ import {
   agentRequestMessage,
   sha256Hex,
 } from "@agentlatch/core";
+import { UNISWAP_SWAP_OUTPUT } from "@agentlatch/uniswap-executor";
 import { privateKeyToAccount } from "viem/accounts";
 import {
   agentEnsName,
@@ -167,7 +168,7 @@ export function submitSwap(input: {
 }): Promise<Action> {
   return submitAction({
     action: "SWAP",
-    target: "0xvenue",
+    target: UNISWAP_SWAP_OUTPUT,
     amount: input.amountUsdc,
     note: input.note,
   });

@@ -123,7 +123,7 @@ export type WorldIdCheckStatus =
   | "FAILED"
   | "CANCELLED";
 
-/** Swaps stay unsigned. An x402 settlement sets `signed` to true. */
+/** A broadcast sets `signed`. API_CALL and CONTRACT_CALL stay unsigned. */
 export type SimulatedExecution = {
   id: string;
   actionRequestId: string;

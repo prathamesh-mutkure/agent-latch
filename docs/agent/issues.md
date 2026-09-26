@@ -21,7 +21,7 @@ Handoff for the next agent. Settled choices stay in `decisions.md`. Do not relit
 
 ## Open
 
-1. **Not run from a phone yet.** Redeploy `apps/web`, restart the API, open the mini app in World App, tap Sign in with World App with the wallet that owns `pilot`, and turn on notifications. On the computer, scan the dashboard's QR code in World App and tap Sign in. From the push on a 2500 USDC swap, tap Approve with World ID and sign. Then tap Open World ID, check the code, and tap Authenticate with World ID. Come back to World App: the page turns Approved. Repeat and tap Deny sign-in on World ID: the page turns Denied and nothing runs. The API path is checked against the live sandbox with local keys. The Safe EIP-1271 path and a human-completed World ID token are first exercised here.
+1. **Not run from a phone yet.** Redeploy `apps/web`, restart the API, open the mini app in World App, tap Sign in with World App with the wallet that owns `pilot`, and turn on notifications. On the computer, scan the dashboard's QR code in World App and tap Sign in. From the push on a 0.5 USDC swap, tap Approve with World ID and sign. Then tap Open World ID, check the code, and tap Authenticate with World ID. Come back to World App: the page turns Approved. Repeat and tap Deny sign-in on World ID: the page turns Denied and nothing runs. The API path is checked against the live sandbox with local keys. The Safe EIP-1271 path and a human-completed World ID token are first exercised here.
 
 2. **World ID says `World ID returned assurance ... not https://world.org/oidc/acr/orb-v3`.** The API requires the Orb class that the sandbox advertises. If mocked proofs return another `acr`, the check fails and the approval stays pending. Read the value from the error before changing `ORB_ACR` in `packages/integrations/world/src/world-id.ts`, and record the change in `decisions.md`.
 
@@ -33,7 +33,7 @@ Handoff for the next agent. Settled choices stay in `decisions.md`. Do not relit
 
 6. **Sign-in or decide fails with `Signature verification failed`.** Recovery did not match and the EIP-1271 call failed. Either World Chain RPC is unreachable (set `WORLDCHAIN_RPC_URL`) or that wallet's Safe is not deployed on World Chain yet.
 
-7. **40 pushes per 4 hours.** The portal app is unverified. Each opened approval is one push. The background agent waits on each approval, then opens another 2500 swap a few ticks later. Raise `AGENT_INTERVAL_MS` for a long session.
+7. **40 pushes per 4 hours.** The portal app is unverified. Each opened approval is one push. The background agent waits on each approval, then opens another 0.5 swap a few ticks later. Raise `AGENT_INTERVAL_MS` for a long session.
 
 8. **No push arrives.** The API logs `world push sent`, `world push not sent: <reason>`, or `world push skipped: ...`. `skipped` means a missing key or an agent with no owner. For `not sent`, check that notifications are on for this mini app in World App. `permission_disabled` or `already_requested` means the person turns it on in World App settings. The approval still shows on `/mini` either way.
 

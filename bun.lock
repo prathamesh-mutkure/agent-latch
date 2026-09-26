@@ -15,6 +15,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@agentlatch/core": "workspace:*",
+        "@agentlatch/uniswap-executor": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "^1.4.2",
@@ -28,6 +29,8 @@
         "@agentlatch/ens": "workspace:*",
         "@agentlatch/intercepta": "workspace:*",
         "@agentlatch/signer-local": "workspace:*",
+        "@agentlatch/transfer-executor": "workspace:*",
+        "@agentlatch/uniswap-executor": "workspace:*",
         "@agentlatch/world": "workspace:*",
         "@agentlatch/x402": "workspace:*",
         "@agentlatch/x402-executor": "workspace:*",
@@ -51,6 +54,7 @@
       },
       "dependencies": {
         "@agentlatch/core": "workspace:*",
+        "@agentlatch/uniswap-executor": "workspace:*",
         "@agentlatch/x402": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.30.1",
         "viem": "^2.56.9",
@@ -93,6 +97,28 @@
     "packages/core": {
       "name": "@agentlatch/core",
       "version": "0.0.0",
+      "devDependencies": {
+        "@types/bun": "^1.4.2",
+      },
+    },
+    "packages/executors/transfer": {
+      "name": "@agentlatch/transfer-executor",
+      "version": "0.0.0",
+      "dependencies": {
+        "@agentlatch/core": "workspace:*",
+        "viem": "^2.47.6",
+      },
+      "devDependencies": {
+        "@types/bun": "^1.4.2",
+      },
+    },
+    "packages/executors/uniswap": {
+      "name": "@agentlatch/uniswap-executor",
+      "version": "0.0.0",
+      "dependencies": {
+        "@agentlatch/core": "workspace:*",
+        "viem": "^2.47.6",
+      },
       "devDependencies": {
         "@types/bun": "^1.4.2",
       },
@@ -176,6 +202,10 @@
     "@agentlatch/mcp": ["@agentlatch/mcp@workspace:apps/mcp"],
 
     "@agentlatch/signer-local": ["@agentlatch/signer-local@workspace:packages/signers/local"],
+
+    "@agentlatch/transfer-executor": ["@agentlatch/transfer-executor@workspace:packages/executors/transfer"],
+
+    "@agentlatch/uniswap-executor": ["@agentlatch/uniswap-executor@workspace:packages/executors/uniswap"],
 
     "@agentlatch/web": ["@agentlatch/web@workspace:apps/web"],
 

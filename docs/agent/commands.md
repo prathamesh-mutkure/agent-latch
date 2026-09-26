@@ -32,7 +32,7 @@ bun --filter @agentlatch/agent dev
 bun --filter @agentlatch/agent dev
 ```
 
-It acts for the agent in `AGENT_ID` and sends `AGENT_KEY` as `x-agent-key`. It cycles three mocked swaps: 100 USDC (allow), 2500 USDC (waits for approval), 10000 USDC (block). It does not approve itself, list agents, create agents, or change policy. Without `AGENT_ID` and `AGENT_KEY` it idles. Copy both from the agent's page. The key is shown once.
+It acts for the agent in `AGENT_ID` and sends `AGENT_KEY` as `x-agent-key`. It cycles three swaps: 0.2 USDC (allow), 0.5 USDC (waits for approval), 2 USDC (block). It does not approve itself, list agents, create agents, or change policy. Without `AGENT_ID` and `AGENT_KEY` it idles. Copy both from the agent's page. The key is shown once.
 
 Owner routes need a session: `Authorization: Bearer <token>`. Sign in on the dashboard, then copy the token from local storage key `agentlatch.session` (field `token`). `GET /agents/:id` adds an `ens` object read from Sepolia ENSv2. Register the agent's label with:
 
@@ -43,13 +43,15 @@ curl -X POST "http://localhost:3001/agents/<agentId>/ens" \
 
 That requires `EXECUTOR_PRIVATE_KEY` for the owner of `ENS_PARENT_NAME` (default `agent-latch.eth`) and Sepolia ETH for gas. The route deploys a UserRegistry if the parent has none, links it with `setSubregistry` and `setParent`, then registers the agent label.
 
-While it waits on the 2500 USDC swap, only the agent's owner can decide, in World App (see below). There is no curl approve. The agent's reads stay open:
+While it waits on the 0.5 USDC swap, only the agent's owner can decide, in World App (see below). There is no curl approve. The agent's reads stay open:
 
 ```sh
 curl "http://localhost:3001/approvals/<approvalId>"
 ```
 
-`X402_PAYMENT` takes the resource URL as `target`. The API gets the 402 quote, and the amount must match it exactly. Intercepta screens the quote's `payTo` before anything is signed. Set `INTERCEPTA_API_KEY`. A missing key refuses the payment. Swaps do not call Intercepta.
+`X402_PAYMENT` takes the resource URL as `target`. The API gets the 402 quote, and the amount must match it exactly. Intercepta screens the quote's `payTo` before anything is signed. Set `INTERCEPTA_API_KEY`. A missing key refuses the payment. Intercepta is not called for other actions.
+
+`TOKEN_TRANSFER` target is an Ethereum address. The amount is Circle USDC. An allow broadcasts a Sepolia transfer from the executor key and stores the transaction hash. `SWAP` target is Sepolia WETH `0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14`. An allow swaps USDC to that WETH through Uniswap SwapRouter02. `0xvenue` is refused. A chain error is returned and the action is not marked executed. `API_CALL` and `CONTRACT_CALL` are policy decisions only.
 
 `GET /x402/resource` is the demo seller. Without a `PAYMENT-SIGNATURE` header it returns 402 with the Sepolia USDC quote in the body and the `PAYMENT-REQUIRED` header. With one, it calls the facilitator at `FACILITATOR_URL` (default `http://localhost:$PORT/facilitator`) to verify and settle, then returns 200 with `PAYMENT-RESPONSE`. `0.01` is under the autonomous limit, so a clear payee is paid immediately. `EXECUTOR_PRIVATE_KEY` signs and must hold Circle USDC. The facilitator key (`FACILITATOR_PRIVATE_KEY`, else `EXECUTOR_PRIVATE_KEY`) pays Sepolia gas. The facilitator settles only to `X402_PAY_TO`.
 

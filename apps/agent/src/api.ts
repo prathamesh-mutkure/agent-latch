@@ -1,3 +1,4 @@
+import { UNISWAP_SWAP_OUTPUT } from "@agentlatch/uniswap-executor";
 import { agentKey, apiUrl } from "./env";
 
 export type ActionResult = {
@@ -54,7 +55,7 @@ export function submitSwap(
     method: "POST",
     body: JSON.stringify({
       action: "SWAP",
-      target: "0xvenue",
+      target: UNISWAP_SWAP_OUTPUT,
       amount,
       note,
     }),

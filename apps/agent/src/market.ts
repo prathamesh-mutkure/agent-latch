@@ -1,7 +1,7 @@
 const ticks = [
-  { note: "ETH steady", amount: "100" },
-  { note: "ETH dropped 6.1%", amount: "2500" },
-  { note: "ETH dropped 18%", amount: "10000" },
+  { note: "ETH steady", amount: "0.2" },
+  { note: "ETH dropped 6.1%", amount: "0.5" },
+  { note: "ETH dropped 18%", amount: "2" },
 ] as const;
 
 let cursor = 0;

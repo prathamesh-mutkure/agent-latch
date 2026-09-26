@@ -8,6 +8,10 @@ import {
   UsdcAmountError,
 } from "@agentlatch/core";
 import { and, asc, eq, gte } from "drizzle-orm";
+import {
+  broadcastAuthorizedAction,
+  refuseSettlementTarget,
+} from "../../broadcast";
 import { db } from "../../db/client";
 import { saveExecution } from "../../executor";
 import {
@@ -81,6 +85,14 @@ export async function submitAction(input: {
   const now = new Date();
   const token = (input.token ?? USDC_SEPOLIA_ADDRESS).toLowerCase();
   const target = input.target.trim();
+  const refused = refuseSettlementTarget({
+    action: input.action,
+    target,
+    token,
+  });
+  if (refused) {
+    return refused;
+  }
   const passport = await readPassportGate(agent, now);
   if (passport.state === "unread") {
     return { ok: false, status: 503, error: passport.error };
@@ -156,6 +168,26 @@ export async function submitAction(input: {
     decision = {
       decision: "ALLOW",
       reasons: [...decision.reasons, `x402 settled ${settled.value.txHash}`],
+    };
+  }
+
+  if (
+    (input.action === "TOKEN_TRANSFER" || input.action === "SWAP") &&
+    decision.decision === "ALLOW"
+  ) {
+    const settled = await broadcastAuthorizedAction({
+      action: input.action,
+      target,
+      token,
+      amount: amount.toString(),
+    });
+    if (!settled.ok) {
+      return settled;
+    }
+    signed = true;
+    decision = {
+      decision: "ALLOW",
+      reasons: [...decision.reasons, settled.value.detail],
     };
   }
 
