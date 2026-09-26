@@ -96,6 +96,14 @@ export async function enableNotifications(): Promise<NotificationState> {
   }
 }
 
+/**
+ * Opens `path` inside the mini app. Built by hand because
+ * `MiniKit.getMiniAppUrl` encodes the path twice, and World App then ignores
+ * it and opens the mini app home.
+ */
 export function miniAppUrl(appId: string, path: string): string {
-  return MiniKit.getMiniAppUrl(appId, path);
+  const url = new URL("https://world.org/mini-app");
+  url.searchParams.set("app_id", appId);
+  url.searchParams.set("path", path.startsWith("/") ? path : `/${path}`);
+  return url.toString();
 }

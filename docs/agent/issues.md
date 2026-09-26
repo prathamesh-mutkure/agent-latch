@@ -43,7 +43,7 @@ Handoff for the next agent. Settled choices stay in `decisions.md`. Do not relit
 
 11. **SIWE domain is not pinned.** MiniKit's verifier checks nonce, statement, request ID, and expiry, not the domain. The statement names the action, so the owner sees what they sign. Pin the domain later.
 
-12. **Sign-in nonces and QR codes live in API memory.** A restart drops a sign-in in flight. Tap Sign in again. The computer shows a new QR code when its code expires or is lost.
+12. **Sign-in nonces and QR codes live in API memory.** A restart drops a sign-in in flight. Tap Sign in again. The computer shows a new QR code when its code expires or is lost. The QR must open `/pair/<code>`. If the phone shows the agent list instead of the code, the computer will not sign in. Scan the code on the computer again.
 
 13. **Signer custody is still open.** One `EXECUTOR_PRIVATE_KEY` on the API. Do not replace `packages/signers/local`.
 
