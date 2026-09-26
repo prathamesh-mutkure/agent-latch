@@ -3,11 +3,21 @@ import {
   createAgentLatchClient,
 } from "@agentlatch/api-client";
 
-// Same origin as the page: Vite proxies /api to the API, so the World session
-// cookie is first-party and sent with every call.
+// Same origin as the page. Vite in dev, and Vercel in production, proxy /api
+// and /auth to the API. The ngrok header is forwarded so the free tunnel
+// returns JSON instead of its browser warning page.
+const tunnelHeaders = { "ngrok-skip-browser-warning": "1" };
+
 export const client: AgentLatchClient = createAgentLatchClient(
   `${window.location.origin}/api`,
+  tunnelHeaders,
 );
+
+function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  const headers = new Headers(init?.headers);
+  headers.set("ngrok-skip-browser-warning", "1");
+  return fetch(path, { ...init, headers });
+}
 
 type CallResult<T> = {
   data: T | null;
@@ -43,12 +53,20 @@ export function getHealth() {
   return read(client.health.get());
 }
 
-export function listAgents() {
-  return read(client.agents.get());
+export async function listAgents() {
+  const data = await read(client.agents.get());
+  if (!Array.isArray(data)) {
+    throw new Error("Agents response was not a list.");
+  }
+  return data;
 }
 
-export function listApprovals() {
-  return read(client.approvals.get());
+export async function listApprovals() {
+  const data = await read(client.approvals.get());
+  if (!Array.isArray(data)) {
+    throw new Error("Approvals response was not a list.");
+  }
+  return data;
 }
 
 function isErrorBody(value: unknown): value is { error: string } {
@@ -117,11 +135,11 @@ export async function getMe() {
 }
 
 export async function signOut() {
-  await fetch("/auth/logout", { method: "POST" });
+  await apiFetch("/auth/logout", { method: "POST" });
 }
 
 export async function worldAppId(): Promise<string | null> {
-  const response = await fetch("/auth/world/app");
+  const response = await apiFetch("/auth/world/app");
   if (!response.ok) {
     return null;
   }
@@ -130,7 +148,7 @@ export async function worldAppId(): Promise<string | null> {
 }
 
 export async function worldNonce(): Promise<string> {
-  const response = await fetch("/auth/world/nonce");
+  const response = await apiFetch("/auth/world/nonce");
   const body = (await response.json()) as { nonce?: string; error?: string };
   if (!response.ok || !body.nonce) {
     throw new Error(body.error ?? "Could not start the wallet link.");
@@ -143,7 +161,7 @@ export async function saveWorldWallet(payload: {
   message: string;
   signature: string;
 }): Promise<void> {
-  const response = await fetch("/auth/world/wallet", {
+  const response = await apiFetch("/auth/world/wallet", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),

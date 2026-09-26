@@ -3,8 +3,12 @@ import { treaty } from "@elysiajs/eden";
 
 const API_URL = "http://localhost:3001";
 
-export function createAgentLatchClient(url = API_URL) {
+export function createAgentLatchClient(
+  url = API_URL,
+  headers?: Record<string, string>,
+) {
   return treaty<App>(url, {
+    headers,
     fetch: { cache: "no-store" },
     parseDate: false,
   });
