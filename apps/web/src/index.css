@@ -30,3 +30,20 @@ body {
   outline: 2px solid currentColor;
   outline-offset: 2px;
 }
+
+/* Tailwind 4 dropped the pointer cursor on buttons. */
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+button,
+a {
+  transition:
+    opacity 120ms,
+    background-color 120ms,
+    border-color 120ms;
+}
+
+button:not(:disabled):hover {
+  opacity: 0.85;
+}

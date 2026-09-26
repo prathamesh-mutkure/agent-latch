@@ -8,7 +8,7 @@ import {
   formatExpiry,
   spentToday,
 } from "../model";
-import { ApprovalActions, Empty, PageHeader, Pill, QueryGate } from "../ui";
+import { DecideOnPhone, PageHeader, Pill, QueryGate, Stat } from "../ui";
 
 function agentName(agents: AgentRecord[], agentId: string): string {
   const agent = agents.find((item) => item.id === agentId);
@@ -23,22 +23,13 @@ export function OverviewPage() {
   const actions = actionQueries.flatMap((query) => query.data ?? []);
   const pending =
     approvals.data?.filter((approval) => approval.status === "PENDING") ?? [];
-  const executedToday = actions.filter((action) => {
-    if (action.status !== "EXECUTED") {
-      return false;
-    }
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    return new Date(action.createdAt).getTime() >= start.getTime();
-  });
-  const blockedToday = actions.filter((action) => {
-    if (action.status !== "BLOCKED") {
-      return false;
-    }
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    return new Date(action.createdAt).getTime() >= start.getTime();
-  });
+  const startOfToday = new Date().setHours(0, 0, 0, 0);
+  const today = (status: string) =>
+    actions.filter(
+      (action) =>
+        action.status === status &&
+        new Date(action.createdAt).getTime() >= startOfToday,
+    ).length;
 
   return (
     <>
@@ -52,27 +43,13 @@ export function OverviewPage() {
         hasData={Boolean(agents.data && approvals.data)}
       >
         <div className="mb-8 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-xl border border-line bg-card p-5">
-            <p className="text-sm text-muted">Agents</p>
-            <p className="mt-2 font-mono text-2xl tabular-nums">
-              {agents.data?.length ?? 0}
-            </p>
-          </div>
-          <div className="rounded-xl border border-line bg-card p-5">
-            <p className="text-sm text-muted">Pending approvals</p>
-            <p className="mt-2 font-mono text-2xl tabular-nums">
-              {pending.length}
-            </p>
-          </div>
-          <div className="rounded-xl border border-line bg-card p-5">
-            <p className="text-sm text-muted">Today</p>
-            <p className="mt-2 font-mono text-2xl tabular-nums">
-              {executedToday.length} allowed
-            </p>
-            <p className="mt-1 text-sm text-muted">
-              {blockedToday.length} blocked
-            </p>
-          </div>
+          <Stat label="Agents" value={String(agents.data?.length ?? 0)} />
+          <Stat label="Pending approvals" value={String(pending.length)} />
+          <Stat
+            label="Today"
+            value={`${today("EXECUTED")} allowed`}
+            detail={`${today("BLOCKED")} blocked`}
+          />
         </div>
         {agents.data && approvals.data ? (
           <PendingList
@@ -82,7 +59,13 @@ export function OverviewPage() {
           />
         ) : null}
         {agents.data && agents.data.length === 0 ? (
-          <Empty>You have no agents yet.</Empty>
+          <p className="text-muted">
+            You have no agents yet.{" "}
+            <Link to="/agents" className="underline">
+              Register one
+            </Link>
+            .
+          </p>
         ) : (
           <ul className="grid gap-4">
             {agents.data?.map((agent) => {
@@ -141,7 +124,7 @@ function PendingList({
               {formatExpiry(approval.expiresAt)} · this approval covers this
               action only
             </p>
-            <ApprovalActions approvalId={approval.id} label={label} />
+            <DecideOnPhone approvalId={approval.id} />
           </article>
         );
       })}
@@ -162,13 +145,13 @@ function AgentCard({
     <Link
       to="/agents/$agentId"
       params={{ agentId: agent.id }}
-      className="block rounded-xl border border-line bg-card p-5"
+      className="block rounded-xl border border-line bg-card p-5 hover:border-muted"
     >
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-lg font-medium">{agent.ens.name ?? agent.name}</h2>
         <Pill>{posture}</Pill>
       </div>
-      <p className="mt-2 font-mono text-sm text-muted">
+      <p className="mt-2 font-mono text-sm break-all text-muted">
         {spent} spent today
         {agent.ens.address ? ` · ${agent.ens.address}` : ""}
       </p>

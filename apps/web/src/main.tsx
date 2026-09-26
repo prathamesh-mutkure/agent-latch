@@ -26,6 +26,13 @@ import { insideWorldApp, installWorldApp } from "./world";
 
 installWorldApp();
 
+/** The dashboard is for the computer. World App gets `/mini`, `/approve`, and `/pair`. */
+function consoleOnly() {
+  if (insideWorldApp) {
+    throw redirect({ to: "/mini" });
+  }
+}
+
 const rootRoute = createRootRoute({
   component: Shell,
 });
@@ -33,41 +40,42 @@ const rootRoute = createRootRoute({
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  beforeLoad: () => {
-    if (insideWorldApp) {
-      throw redirect({ to: "/mini" });
-    }
-  },
+  beforeLoad: consoleOnly,
   component: OverviewPage,
 });
 
 const agentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/agents",
+  beforeLoad: consoleOnly,
   component: AgentsPage,
 });
 
 const agentRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/agents/$agentId",
+  beforeLoad: consoleOnly,
   component: AgentPage,
 });
 
 const policiesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/policies",
+  beforeLoad: consoleOnly,
   component: PoliciesPage,
 });
 
 const activityRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/activity",
+  beforeLoad: consoleOnly,
   component: ActivityPage,
 });
 
 const approvalsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/approvals",
+  beforeLoad: consoleOnly,
   component: ApprovalsPage,
 });
 
@@ -80,6 +88,7 @@ const approveRoute = createRoute({
 const paymentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/payments",
+  beforeLoad: consoleOnly,
   component: PaymentsPage,
 });
 

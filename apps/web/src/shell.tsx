@@ -72,7 +72,7 @@ function ConsoleShell() {
                 key={link.to}
                 to={link.to}
                 activeOptions={{ exact: link.exact }}
-                className="flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm whitespace-nowrap text-paper/70"
+                className="flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm whitespace-nowrap text-paper/70 hover:bg-white/5 hover:text-paper"
                 activeProps={{ className: "bg-white/10 text-paper" }}
               >
                 <span>{link.label}</span>
@@ -85,9 +85,9 @@ function ConsoleShell() {
             ))}
           </nav>
         ) : null}
-        <div className="mt-auto hidden px-6 pb-6 text-xs text-paper/50 md:block">
+        <div className="mt-auto flex items-center justify-between gap-3 px-6 pb-4 text-xs text-paper/50 md:block md:pb-6">
           {session ? (
-            <div className="mb-3 grid gap-1">
+            <div className="flex items-center gap-3 md:mb-3 md:grid md:gap-1">
               <span className="font-mono">{shortWallet(session.wallet)}</span>
               <button
                 type="button"
@@ -98,7 +98,13 @@ function ConsoleShell() {
               </button>
             </div>
           ) : null}
-          <p>Sepolia · {apiUp ? "API up" : "API unreachable"}</p>
+          <p className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className={`size-1.5 rounded-full ${apiUp ? "bg-allow-soft" : "bg-block-soft"}`}
+            />
+            Sepolia · {apiUp ? "API up" : "API unreachable"}
+          </p>
         </div>
       </aside>
       <main className="mx-auto w-full max-w-5xl px-6 py-8 md:px-10 md:py-10">

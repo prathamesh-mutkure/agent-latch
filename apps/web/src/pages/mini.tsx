@@ -29,8 +29,7 @@ function OutsideWorldApp() {
       />
       <Panel>
         <p className="text-sm text-muted">
-          Open DSAP in World App to turn on notifications and decide
-          approvals.
+          Open DSAP in World App to turn on notifications and decide approvals.
         </p>
         <OpenInWorldApp path="/mini" label="Open in World App" />
       </Panel>
@@ -177,8 +176,8 @@ function SignedInHome({
           </p>
         ) : notifications === "blocked" ? (
           <p className="text-sm text-muted">
-            Off. Turn on notifications for DSAP in World App settings,
-            then reopen this page.
+            Off. Turn on notifications for DSAP in World App settings, then
+            reopen this page.
           </p>
         ) : (
           <>

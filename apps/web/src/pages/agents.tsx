@@ -16,7 +16,7 @@ import {
 } from "../api";
 import { useAccount, useAgents, useAllActions } from "../hooks";
 import { agentPosture, ensState } from "../model";
-import { Empty, PageHeader, Panel, Pill, QueryGate } from "../ui";
+import { CopyButton, Empty, PageHeader, Panel, Pill, QueryGate } from "../ui";
 
 export function AgentsPage() {
   const agents = useAgents();
@@ -30,16 +30,13 @@ export function AgentsPage() {
         title="Agents"
         detail="Each agent has an ENS name, a key, and a policy. The key is shown once."
       />
-      <div className="mb-4">
-        <RegisterAgent />
-      </div>
       <QueryGate
         isPending={agents.isPending}
         error={agents.error}
         hasData={Boolean(agents.data)}
       >
         {agents.data?.length === 0 ? (
-          <Empty>You have no agents yet.</Empty>
+          <Empty>You have no agents yet. Register one below.</Empty>
         ) : (
           <ul className="grid gap-3">
             {agents.data?.map((agent) => {
@@ -52,7 +49,7 @@ export function AgentsPage() {
                   <Link
                     to="/agents/$agentId"
                     params={{ agentId: agent.id }}
-                    className="block rounded-xl border border-line bg-card p-5"
+                    className="block rounded-xl border border-line bg-card p-5 hover:border-muted"
                   >
                     <div className="flex flex-wrap items-center gap-3">
                       <h2 className="text-lg font-medium">
@@ -76,6 +73,9 @@ export function AgentsPage() {
           </ul>
         )}
       </QueryGate>
+      <div className="mt-8">
+        <RegisterAgent />
+      </div>
     </>
   );
 }
@@ -385,7 +385,7 @@ function RegisterAgent() {
         <button
           type="submit"
           disabled={pending || problem !== null}
-          className="w-fit rounded-md border border-ink px-4 py-2 text-sm font-medium disabled:opacity-50"
+          className="w-fit rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper disabled:opacity-50"
         >
           {pending ? "Registering…" : "Register"}
         </button>
@@ -401,7 +401,9 @@ function RegisterAgent() {
             className="rounded-md border border-line bg-card p-3 font-mono text-sm"
             rows={3}
             value={created.key}
+            onFocus={(event) => event.currentTarget.select()}
           />
+          <CopyButton value={created.key} />
           <p className="text-sm text-muted">
             Put it in <span className="font-mono">AGENT_KEY</span> for the
             background agent and Claude. Agent id{" "}

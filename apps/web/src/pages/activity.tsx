@@ -1,7 +1,7 @@
 import type { AgentRecord, AuditRecord } from "../api";
 import { useAgents, useAllAudit } from "../hooks";
 import { formatWhen } from "../model";
-import { Empty, PageHeader, Pill, QueryGate } from "../ui";
+import { Empty, PageHeader, Pill, QueryGate, TxText } from "../ui";
 
 export function ActivityPage() {
   const agents = useAgents();
@@ -59,7 +59,9 @@ function TimelineItem({
           {formatWhen(event.createdAt)}
         </time>
       </div>
-      <p className="mt-2 text-sm">{event.summary}</p>
+      <p className="mt-2 text-sm break-words">
+        <TxText text={event.summary} />
+      </p>
     </li>
   );
 }

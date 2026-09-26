@@ -86,8 +86,8 @@ export function SignInPage() {
             </div>
             <div className="grid gap-3">
               <p className="text-sm">
-                Scan with your phone's camera. It opens DSAP in World App.
-                Check that the phone shows this code, then tap Sign in.
+                Scan with your phone's camera. It opens DSAP in World App. Check
+                that the phone shows this code, then tap Sign in.
               </p>
               <p className="font-mono text-3xl font-semibold tracking-widest">
                 {formatPairingCode(pairing.code)}

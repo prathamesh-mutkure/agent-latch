@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useParams } from "@tanstack/react-router";
+import { Link, useParams } from "@tanstack/react-router";
 import { useState } from "react";
 import { issueAgentKey, registerAgentEns } from "../api";
 import {
@@ -23,7 +23,8 @@ import {
 } from "../model";
 import { useSession } from "../session";
 import {
-  ApprovalActions,
+  CopyButton,
+  DecideOnPhone,
   Empty,
   Field,
   PageHeader,
@@ -31,6 +32,7 @@ import {
   Pill,
   QueryGate,
   Stat,
+  TxText,
 } from "../ui";
 
 export function AgentPage() {
@@ -66,7 +68,15 @@ export function AgentPage() {
       hasData={Boolean(agents.data)}
     >
       {!agent ? (
-        <PageHeader title="Agent not found" />
+        <>
+          <PageHeader
+            title="Agent not found"
+            detail="It does not exist, or it belongs to another owner."
+          />
+          <Link to="/agents" className="text-sm underline">
+            All agents
+          </Link>
+        </>
       ) : (
         <>
           <div className="mb-8 flex flex-wrap items-center gap-3">
@@ -146,10 +156,7 @@ export function AgentPage() {
                 <p className="mt-1 text-sm text-muted">
                   This approval covers this action only.
                 </p>
-                <ApprovalActions
-                  approvalId={pending.id}
-                  label={`${pending.action} ${formatDollars(pending.amountUsdc)}`}
-                />
+                <DecideOnPhone approvalId={pending.id} />
               </Panel>
             ) : (
               <Panel title="Pending approval">
@@ -220,11 +227,21 @@ export function AgentPage() {
                           {formatWhen(event.createdAt)}
                         </time>
                       </div>
-                      <p className="text-sm">{event.summary}</p>
+                      <p className="text-sm break-words">
+                        <TxText text={event.summary} />
+                      </p>
                     </li>
                   ))}
                 </ol>
               )}
+              {events.length > 8 ? (
+                <Link
+                  to="/activity"
+                  className="mt-4 inline-block text-sm underline"
+                >
+                  All activity
+                </Link>
+              ) : null}
             </Panel>
           </div>
         </>
@@ -244,9 +261,9 @@ function AgentKey({ agentId, hasKey }: { agentId: string; hasKey: boolean }) {
       "command": "bun",
       "args": ["apps/mcp/src/index.ts"],
       "env": {
-        "API_URL": "http://localhost:3001",
+        "API_URL": "${window.location.origin}/api",
         "AGENT_ID": "${agentId}",
-        "AGENT_KEY": "<the key shown once>"
+        "AGENT_KEY": "${key ?? "<the key shown once>"}"
       }
     }
   }
@@ -283,7 +300,9 @@ function AgentKey({ agentId, hasKey }: { agentId: string; hasKey: boolean }) {
             className="rounded-md border border-line bg-card p-3 font-mono text-sm"
             rows={3}
             value={key}
+            onFocus={(event) => event.currentTarget.select()}
           />
+          <CopyButton value={key} />
         </div>
       ) : (
         <>
@@ -303,9 +322,12 @@ function AgentKey({ agentId, hasKey }: { agentId: string; hasKey: boolean }) {
         </>
       )}
       {error ? <p className="mt-2 text-sm text-block">{error}</p> : null}
-      <h3 className="mt-5 text-sm font-medium tracking-wide text-muted">
-        Connect to Claude
-      </h3>
+      <div className="mt-5 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-medium tracking-wide text-muted">
+          Connect to Claude
+        </h3>
+        <CopyButton value={snippet} />
+      </div>
       <pre className="mt-2 overflow-x-auto rounded-md border border-line p-3 font-mono text-xs">
         {snippet}
       </pre>

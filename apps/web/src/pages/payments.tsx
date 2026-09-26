@@ -1,6 +1,6 @@
 import { useAgents, useAllActions } from "../hooks";
 import { formatDollars, formatWhen } from "../model";
-import { Empty, PageHeader, Pill, QueryGate } from "../ui";
+import { Empty, PageHeader, Pill, QueryGate, TxText } from "../ui";
 
 export function PaymentsPage() {
   const agents = useAgents();
@@ -42,11 +42,13 @@ export function PaymentsPage() {
                       {formatDollars(payment.amountUsdc)}
                     </p>
                   </div>
-                  <p className="mt-2 text-sm text-muted">
+                  <p className="mt-2 text-sm break-all text-muted">
                     {agent?.ens.name ?? agent?.name ?? payment.agentId} ·{" "}
                     {payment.target}
                   </p>
-                  <p className="mt-1 text-sm">{payment.reasons.join(" ")}</p>
+                  <p className="mt-1 text-sm break-words">
+                    <TxText text={payment.reasons.join(" · ")} />
+                  </p>
                   <time
                     className="mt-2 block text-xs text-muted"
                     dateTime={payment.createdAt}

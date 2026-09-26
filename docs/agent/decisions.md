@@ -343,6 +343,12 @@ Supersedes the ngrok fetch header in "World App is the only human surface".
 - The ngrok tunnel is gone. Browser fetches do not send `ngrok-skip-browser-warning`.
 - `apps/mcp` stays stdio on the demo machine. Do not deploy it as a public HTTP service.
 
+## 2026-09-27 — Approvals are decided only in the mini app
+
+- `/approve/:id` is the single place to approve or deny, and the buttons render only inside World App. The dashboard never shows them.
+- On a computer that route shows the approval's status and a QR code that opens it in World App. Dashboard approval cards link there ("Decide on your phone").
+- Inside World App the dashboard routes redirect to `/mini`. World App gets `/mini`, `/approve/:id`, and `/pair/:code`.
+
 ## How to change a decision
 
 Add a new dated section that names what it supersedes. Leave the old section in place and mark it superseded.

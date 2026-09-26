@@ -1,8 +1,14 @@
-import { Link } from "@tanstack/react-router";
 import type { ActionRecord, AgentRecord, ApprovalRecord } from "../api";
 import { useAgents, useAllActions, useApprovals } from "../hooks";
 import { formatDollars, formatExpiry, formatWhen } from "../model";
-import { ApprovalActions, Empty, PageHeader, Pill, QueryGate } from "../ui";
+import {
+  DecideOnPhone,
+  Empty,
+  PageHeader,
+  Pill,
+  QueryGate,
+  TxText,
+} from "../ui";
 
 export function ApprovalsPage() {
   const approvals = useApprovals();
@@ -21,8 +27,8 @@ export function ApprovalsPage() {
   return (
     <>
       <PageHeader
-        title="Pending approvals"
-        detail="Approve and deny each ask for a fresh World ID proof from the agent's owner, bound to that one decision."
+        title="Approvals"
+        detail="Actions above the autonomous limit wait here. Deny is one World App signature. Approve is a signature plus a fresh World ID check, bound to that one action."
       />
       <QueryGate
         isPending={approvals.isPending}
@@ -63,7 +69,9 @@ export function ApprovalsPage() {
                       {approval.action} {formatDollars(approval.amountUsdc)}
                     </p>
                   </div>
-                  <p className="mt-2 text-sm text-muted">{approval.reason}</p>
+                  <p className="mt-2 text-sm text-muted">
+                    <TxText text={approval.reason} />
+                  </p>
                   <p className="mt-1 text-xs text-muted">
                     {formatWhen(approval.createdAt)}
                   </p>
@@ -94,13 +102,6 @@ function ApprovalCard({
       <div className="flex flex-wrap items-center gap-3">
         <Pill>PENDING</Pill>
         <h2 className="text-2xl font-semibold tabular-nums">{label}</h2>
-        <Link
-          to="/approve/$approvalId"
-          params={{ approvalId: approval.id }}
-          className="ml-auto text-sm underline"
-        >
-          Details
-        </Link>
       </div>
       <p className="mt-3 text-sm">
         {agent?.ens.name ?? agent?.name ?? approval.agentId}
@@ -128,7 +129,7 @@ function ApprovalCard({
       <p className="mt-3 text-sm text-muted">
         This approval covers this action only.
       </p>
-      <ApprovalActions approvalId={approval.id} label={label} />
+      <DecideOnPhone approvalId={approval.id} />
     </article>
   );
 }

@@ -10,11 +10,9 @@ import type { SignedWalletAuth } from "./world";
 // to the API.
 export const client: AgentLatchClient = createAgentLatchClient(
   `${window.location.origin}/api`,
-  () => {
+  (): Record<string, string> => {
     const session = currentSession();
-    return session
-      ? { authorization: `Bearer ${session.token}` }
-      : {};
+    return session ? { authorization: `Bearer ${session.token}` } : {};
   },
 );
 
