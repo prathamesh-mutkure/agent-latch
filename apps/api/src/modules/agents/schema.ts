@@ -1,8 +1,11 @@
 import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { users } from "../users/schema";
 
 export const agents = pgTable("agents", {
   id: uuid("id").primaryKey(),
   name: text("name").notNull(),
+  /** Owner who approves this agent's exceptional actions. Null until claimed. */
+  userId: uuid("user_id").references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 });
 

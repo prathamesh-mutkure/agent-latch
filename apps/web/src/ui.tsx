@@ -1,6 +1,5 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { approveApproval, rejectApproval } from "./api";
+import { useMe } from "./hooks";
 
 export function toneFor(kind: string): "allow" | "block" | "wait" | "neutral" {
   if (
@@ -17,6 +16,8 @@ export function toneFor(kind: string): "allow" | "block" | "wait" | "neutral" {
     kind === "BLOCK" ||
     kind === "BLOCKED" ||
     kind === "REJECTED" ||
+    kind === "FAILED" ||
+    kind === "CANCELLED" ||
     kind === "High"
   ) {
     return "block";
@@ -140,6 +141,7 @@ export function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Approve and deny each need a fresh World ID proof from the agent's owner. */
 export function ApprovalActions({
   approvalId,
   label,
@@ -147,46 +149,37 @@ export function ApprovalActions({
   approvalId: string;
   label: string;
 }) {
-  const queryClient = useQueryClient();
-  const refresh = async () => {
-    await queryClient.invalidateQueries();
-  };
-  const approve = useMutation({
-    mutationFn: () => approveApproval(approvalId),
-    onSuccess: refresh,
-  });
-  const reject = useMutation({
-    mutationFn: () => rejectApproval(approvalId),
-    onSuccess: refresh,
-  });
-  const pending = approve.isPending || reject.isPending;
-  const error = approve.error ?? reject.error;
+  const me = useMe();
+
+  if (!me.data) {
+    return (
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <a
+          href="/auth/world/login"
+          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper"
+        >
+          Sign in with World ID to decide
+        </a>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-4 flex flex-wrap items-center gap-3">
-      <button
-        type="button"
-        className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper disabled:opacity-50"
-        disabled={pending}
-        aria-label={`Approve ${label}`}
-        onClick={() => approve.mutate()}
+      <a
+        href={`/auth/world/step-up?approval=${approvalId}&decision=approve`}
+        className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper"
+        aria-label={`Approve ${label} with World ID`}
       >
-        {approve.isPending ? "Approving…" : "Approve"}
-      </button>
-      <button
-        type="button"
-        className="rounded-md border border-block px-4 py-2 text-sm font-medium text-block disabled:opacity-50"
-        disabled={pending}
-        aria-label={`Reject ${label}`}
-        onClick={() => reject.mutate()}
+        Approve with World ID
+      </a>
+      <a
+        href={`/auth/world/step-up?approval=${approvalId}&decision=deny`}
+        className="rounded-md border border-block px-4 py-2 text-sm font-medium text-block"
+        aria-label={`Deny ${label} with World ID`}
       >
-        {reject.isPending ? "Rejecting…" : "Reject"}
-      </button>
-      {error ? (
-        <p role="alert" className="text-sm text-block">
-          {error instanceof Error ? error.message : "Request failed."}
-        </p>
-      ) : null}
+        Deny with World ID
+      </a>
     </div>
   );
 }

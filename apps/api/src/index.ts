@@ -6,12 +6,14 @@ import { actionRoutes } from "./modules/actions/routes";
 import { agentsRoutes } from "./modules/agents/routes";
 import { approvalRoutes } from "./modules/approvals/routes";
 import { auditRoutes } from "./modules/audit/routes";
+import { authRoutes } from "./modules/auth/routes";
 import { healthRoutes } from "./modules/health/routes";
 import { x402Routes } from "./modules/x402/routes";
 
 export const app = new Elysia()
   .use(cors())
   .use(healthRoutes)
+  .use(authRoutes)
   .use(agentsRoutes)
   .use(actionRoutes)
   .use(approvalRoutes)

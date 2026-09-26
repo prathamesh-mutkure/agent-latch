@@ -15,7 +15,10 @@ export type AuditKind =
   | "HUMAN_APPROVAL"
   | "APPROVED"
   | "REJECTED"
-  | "EXPIRED";
+  | "EXPIRED"
+  | "CANCELLED"
+  | "FAILED"
+  | "AGENT_CLAIMED";
 
 export type AuditEventDto = {
   id: string;

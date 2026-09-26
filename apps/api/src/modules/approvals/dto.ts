@@ -23,6 +23,7 @@ export function toApproval(row: ApprovalRow): ApprovalRequest {
     expiresAt,
     createdAt: row.createdAt.toISOString(),
     nonce: row.nonce,
+    failureReason: row.failureReason,
     authorization: {
       agentId: row.agentId,
       action: row.action as ActionType,
@@ -60,6 +61,7 @@ export type ApprovalDto = {
   expiresAt: string;
   createdAt: string;
   nonce: string;
+  failureReason: string | null;
   authorization: AuthorizationDto;
 };
 
@@ -78,6 +80,7 @@ export function toApprovalDto(approval: ApprovalRequest): ApprovalDto {
     expiresAt: approval.expiresAt,
     createdAt: approval.createdAt,
     nonce: approval.nonce,
+    failureReason: approval.failureReason,
     authorization: {
       ...approval.authorization,
       amountUsdc: formatUsdc(approval.authorization.amount),

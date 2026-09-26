@@ -22,11 +22,14 @@ export type ApprovalStatus =
   | "APPROVED"
   | "REJECTED"
   | "EXPIRED"
-  | "CANCELLED";
+  | "CANCELLED"
+  | "FAILED";
 
 export type Agent = {
   id: string;
   name: string;
+  /** Owner who approves this agent's exceptional actions. Null until claimed. */
+  userId: string | null;
   createdAt: string;
 };
 
@@ -87,6 +90,8 @@ export type ApprovalRequest = {
   expiresAt: string;
   createdAt: string;
   nonce: string;
+  /** Set when status is FAILED, for example WRONG_HUMAN. */
+  failureReason: string | null;
   authorization: ScopedAuthorization;
 };
 

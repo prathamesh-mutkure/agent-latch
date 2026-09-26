@@ -1,23 +1,74 @@
 import {
   type ActionRequest,
   type ApprovalRequest,
+  type ApprovalStatus,
   authorizationMatches,
 } from "@agentlatch/core";
+import {
+  type BindingFields,
+  checkApprovalTicket,
+  computeBindingHash,
+  type StepUpDecision,
+  type WorldIdentity,
+} from "@agentlatch/world";
 import { asc, eq } from "drizzle-orm";
-import type { Db } from "../../db/client";
+import type { Db, Tx } from "../../db/client";
 import { db } from "../../db/client";
 import { saveExecution } from "../../executor";
 import { settleAuthorizedPayment } from "../../payments";
 import type { Failure, Success } from "../../result";
 import { toAction } from "../actions/dto";
 import { actions } from "../actions/schema";
-import { passportFailure, readPassportGate } from "../agents/passport";
+import { readPassportGate } from "../agents/passport";
+import { agents } from "../agents/schema";
 import { getAgent } from "../agents/service";
-import { expireDue, recordAudit } from "../audit/service";
+import { type AuditKind, expireDue, recordAudit } from "../audit/service";
+import { users } from "../users/schema";
 import { toApproval } from "./dto";
 import { approvals } from "./schema";
 
-const APPROVAL_TTL_MS = 15 * 60 * 1000;
+/** A fresh approval is short-lived: the owner decides within five minutes. */
+const APPROVAL_TTL_MS = 5 * 60 * 1000;
+
+/** Outcome of a World step-up, shown on the approve page as `?result=`. */
+export type StepUpResult =
+  | "paid"
+  | "approved"
+  | "denied"
+  | "cancelled"
+  | "expired"
+  | "not_pending"
+  | "binding"
+  | "wrong_human"
+  | "stale"
+  | "payment_failed"
+  | "deny_cancelled"
+  | "passport_inactive"
+  | "passport_unread";
+
+type ApprovalRow = typeof approvals.$inferSelect;
+
+function bindingFields(row: {
+  id: string;
+  agentId: string;
+  action: string;
+  target: string;
+  token: string;
+  amount: string;
+  nonce: string;
+  expiresAt: Date;
+}): BindingFields {
+  return {
+    approvalId: row.id,
+    agentId: row.agentId,
+    action: row.action,
+    target: row.target,
+    token: row.token,
+    amount: row.amount,
+    nonce: row.nonce,
+    expiresAt: row.expiresAt.toISOString(),
+  };
+}
 
 export async function listApprovals(): Promise<ApprovalRequest[]> {
   const now = new Date();
@@ -53,7 +104,7 @@ export async function openApproval(
   reasons: string[],
   now: Date,
 ): Promise<ApprovalRequest> {
-  const expiresAt = new Date(now.getTime() + APPROVAL_TTL_MS).toISOString();
+  const expiresAt = new Date(now.getTime() + APPROVAL_TTL_MS);
   const approval: ApprovalRequest = {
     id: crypto.randomUUID(),
     agentId: action.agentId,
@@ -64,9 +115,10 @@ export async function openApproval(
     target: action.target,
     reason: reasons.join(" "),
     status: "PENDING",
-    expiresAt,
+    expiresAt: expiresAt.toISOString(),
     createdAt: now.toISOString(),
     nonce: action.nonce,
+    failureReason: null,
     authorization: {
       agentId: action.agentId,
       action: action.action,
@@ -74,7 +126,7 @@ export async function openApproval(
       token: action.token,
       amount: action.amount,
       nonce: action.nonce,
-      expiresAt,
+      expiresAt: expiresAt.toISOString(),
     },
   };
   await tx.insert(approvals).values({
@@ -87,77 +139,324 @@ export async function openApproval(
     target: approval.target,
     reason: approval.reason,
     status: approval.status,
-    expiresAt: new Date(expiresAt),
+    expiresAt,
     createdAt: now,
     nonce: approval.nonce,
+    bindingHash: computeBindingHash(bindingFields({ ...approval, expiresAt })),
   });
   return approval;
 }
 
-export async function resolveApproval(
+type Loaded = {
+  row: ApprovalRow;
+  approval: ApprovalRequest;
+  action: ActionRequest;
+  ownerId: string | null;
+};
+
+/** Expires due approvals, then locks and loads one approval with its action and owner. */
+async function loadForUpdate(
+  tx: Tx,
   approvalId: string,
-  outcome: "approve" | "reject",
-): Promise<
-  Success<{ approval: ApprovalRequest; action: ActionRequest }> | Failure
-> {
+  now: Date,
+): Promise<Success<Loaded> | Failure> {
+  await expireDue(tx, now);
+  const approvalRows = await tx
+    .select()
+    .from(approvals)
+    .where(eq(approvals.id, approvalId))
+    .limit(1)
+    .for("update");
+  const row = approvalRows[0];
+  if (!row) {
+    return { ok: false, status: 404, error: "Approval not found." };
+  }
+  const actionRows = await tx
+    .select()
+    .from(actions)
+    .where(eq(actions.id, row.actionRequestId))
+    .limit(1);
+  const actionRow = actionRows[0];
+  if (!actionRow) {
+    return { ok: false, status: 404, error: "Action not found." };
+  }
+  const agentRows = await tx
+    .select({ userId: agents.userId })
+    .from(agents)
+    .where(eq(agents.id, row.agentId))
+    .limit(1);
+  return {
+    ok: true,
+    value: {
+      row,
+      approval: toApproval(row),
+      action: toAction(actionRow),
+      ownerId: agentRows[0]?.userId ?? null,
+    },
+  };
+}
+
+/** Ends an approval without running the action. */
+async function closeApproval(
+  tx: Tx,
+  loaded: Loaded,
+  outcome: {
+    status: Exclude<ApprovalStatus, "PENDING" | "APPROVED">;
+    kind: AuditKind;
+    summary: string;
+    failureReason?: string;
+    now: Date;
+  },
+) {
+  const { approval, action } = loaded;
+  const actionStatus = outcome.status === "EXPIRED" ? "EXPIRED" : "REJECTED";
+  approval.status = outcome.status;
+  approval.failureReason = outcome.failureReason ?? null;
+  action.status = actionStatus;
+  await tx
+    .update(approvals)
+    .set({
+      status: outcome.status,
+      failureReason: outcome.failureReason ?? null,
+    })
+    .where(eq(approvals.id, approval.id));
+  await tx
+    .update(actions)
+    .set({ status: actionStatus })
+    .where(eq(actions.id, action.id));
+  await recordAudit(tx, {
+    agentId: action.agentId,
+    actionRequestId: action.id,
+    approvalId: approval.id,
+    kind: outcome.kind,
+    summary: outcome.summary,
+    createdAt: outcome.now,
+  });
+  console.log(
+    `${action.agentId} approval ${approval.id} -> ${outcome.status}${
+      outcome.failureReason ? ` ${outcome.failureReason}` : ""
+    }`,
+  );
+}
+
+function requireOwner(loaded: Loaded, userId: string): Failure | undefined {
+  if (!loaded.ownerId || loaded.ownerId !== userId) {
+    return {
+      ok: false,
+      status: 403,
+      error: "Only this agent's owner can decide its approvals.",
+    };
+  }
+  if (loaded.approval.status !== "PENDING") {
+    return {
+      ok: false,
+      status: 409,
+      error: `Approval is ${loaded.approval.status}.`,
+    };
+  }
+  return undefined;
+}
+
+/**
+ * Owner pressed Approve or Deny. Records when the World step-up started, which
+ * the freshness check compares `auth_time` against. Returns the binding hash.
+ */
+export async function startStepUp(
+  approvalId: string,
+  userId: string,
+): Promise<Success<{ bindingHash: string }> | Failure> {
   const now = new Date();
   return db.transaction(async (tx) => {
-    await expireDue(tx, now);
-    const approvalRows = await tx
-      .select()
-      .from(approvals)
-      .where(eq(approvals.id, approvalId))
-      .limit(1);
-    const approvalRow = approvalRows[0];
-    if (!approvalRow) {
-      return { ok: false, status: 404, error: "Approval not found." };
+    const loaded = await loadForUpdate(tx, approvalId, now);
+    if (!loaded.ok) {
+      return loaded;
     }
-    const approval = toApproval(approvalRow);
-    if (approval.status !== "PENDING") {
+    const refused = requireOwner(loaded.value, userId);
+    if (refused) {
+      return refused;
+    }
+    const bindingHash = loaded.value.row.bindingHash;
+    if (!bindingHash) {
       return {
         ok: false,
         status: 409,
-        error: `Approval is ${approval.status}.`,
+        error: "Approval predates World binding. Ask the agent to retry.",
       };
     }
+    await tx
+      .update(approvals)
+      .set({ stepUpStartedAt: now })
+      .where(eq(approvals.id, approvalId));
+    return { ok: true, value: { bindingHash } };
+  });
+}
 
-    const actionRows = await tx
-      .select()
-      .from(actions)
-      .where(eq(actions.id, approval.actionRequestId))
-      .limit(1);
-    const actionRow = actionRows[0];
-    if (!actionRow) {
-      return { ok: false, status: 404, error: "Action not found." };
+/**
+ * Owner backed out on the World screen. Backing out of Approve cancels the
+ * approval. Backing out of Deny leaves it pending, so the owner can decide again.
+ */
+export async function cancelStepUp(
+  approvalId: string,
+  userId: string | null,
+  decision: StepUpDecision,
+): Promise<StepUpResult> {
+  if (decision === "deny") {
+    return "deny_cancelled";
+  }
+  const now = new Date();
+  return db.transaction(async (tx) => {
+    const loaded = await loadForUpdate(tx, approvalId, now);
+    if (!loaded.ok) {
+      return "not_pending";
     }
-    const action = toAction(actionRow);
+    if (loaded.value.approval.status === "EXPIRED") {
+      return "expired";
+    }
+    if (!userId || requireOwner(loaded.value, userId)) {
+      return "not_pending";
+    }
+    await closeApproval(tx, loaded.value, {
+      status: "CANCELLED",
+      kind: "CANCELLED",
+      summary: `Cancelled on the World ID screen: ${loaded.value.approval.reason}`,
+      now,
+    });
+    return "cancelled";
+  });
+}
+
+const failureResults = {
+  BINDING: "binding",
+  WRONG_HUMAN: "wrong_human",
+  STALE_VERIFICATION: "stale",
+} as const;
+
+/**
+ * Runs the server-side checks on a validated World ticket, then applies the
+ * owner's decision: deny closes the approval, approve executes the action.
+ * The agent never triggers execution; only this path does.
+ */
+export async function decideWithWorld(
+  approvalId: string,
+  identity: WorldIdentity,
+  cookieNonce: string,
+  decision: StepUpDecision,
+): Promise<StepUpResult> {
+  const now = new Date();
+  return db.transaction(async (tx) => {
+    const loaded = await loadForUpdate(tx, approvalId, now);
+    if (!loaded.ok) {
+      return "not_pending";
+    }
+    const { row, approval, action, ownerId } = loaded.value;
+    const ownerRows = ownerId
+      ? await tx
+          .select({ iss: users.worldIss, sub: users.worldSub })
+          .from(users)
+          .where(eq(users.id, ownerId))
+          .limit(1)
+      : [];
+
+    const check = checkApprovalTicket({
+      identity,
+      approval: {
+        status: row.status,
+        expiresAt: row.expiresAt,
+        bindingHash: row.bindingHash,
+        stepUpStartedAt: row.stepUpStartedAt,
+        fields: bindingFields(row),
+      },
+      owner: ownerRows[0] ?? null,
+      cookieNonce,
+      decision,
+      now,
+    });
+
+    if (!check.ok) {
+      switch (check.reason) {
+        case "NOT_PENDING":
+          return approval.status === "EXPIRED" ? "expired" : "not_pending";
+        case "EXPIRED":
+          await closeApproval(tx, loaded.value, {
+            status: "EXPIRED",
+            kind: "EXPIRED",
+            summary: `Approval expired before World ID finished: ${approval.reason}`,
+            now,
+          });
+          return "expired";
+        default:
+          await closeApproval(tx, loaded.value, {
+            status: "FAILED",
+            kind: "FAILED",
+            summary: `World ID check failed (${check.reason}): ${approval.reason}`,
+            failureReason: check.reason,
+            now,
+          });
+          return failureResults[check.reason];
+      }
+    }
+
+    if (decision === "deny") {
+      await closeApproval(tx, loaded.value, {
+        status: "REJECTED",
+        kind: "REJECTED",
+        summary: `Denied with a fresh World ID proof: ${approval.reason}`,
+        now,
+      });
+      await tx
+        .update(approvals)
+        .set({ worldAuthTime: identity.authTime })
+        .where(eq(approvals.id, approval.id));
+      return "denied";
+    }
+
     if (!authorizationMatches(approval.authorization, action)) {
-      return {
-        ok: false,
-        status: 409,
-        error: "Approval does not match the action.",
-      };
+      await closeApproval(tx, loaded.value, {
+        status: "FAILED",
+        kind: "FAILED",
+        summary: `Approval no longer matches the action: ${approval.reason}`,
+        failureReason: "BINDING",
+        now,
+      });
+      return "binding";
     }
 
-    if (outcome === "approve") {
-      const agent = await getAgent(action.agentId);
-      if (!agent) {
-        return { ok: false, status: 404, error: "Agent not found." };
-      }
-      const blocked = passportFailure(await readPassportGate(agent.name, now));
-      if (blocked) {
-        return blocked;
-      }
+    // The agent's ENS name must still be registered and unexpired before anything runs.
+    const agent = await getAgent(action.agentId);
+    const gate = agent
+      ? await readPassportGate(agent.name, now)
+      : ({ state: "inactive", reason: "Agent not found." } as const);
+    if (gate.state === "unread") {
+      // ENS could not be read. Leave the approval pending so the owner can retry.
+      return "passport_unread";
+    }
+    if (gate.state === "inactive") {
+      await closeApproval(tx, loaded.value, {
+        status: "FAILED",
+        kind: "FAILED",
+        summary: `${gate.reason} Approval not executed: ${approval.reason}`,
+        failureReason: "PASSPORT_INACTIVE",
+        now,
+      });
+      return "passport_inactive";
     }
 
-    if (outcome === "approve" && action.action === "X402_PAYMENT") {
+    const paid = action.action === "X402_PAYMENT";
+    if (paid) {
       const settled = await settleAuthorizedPayment({
         target: action.target,
         token: action.token,
         amount: action.amount,
       });
       if (!settled.ok) {
-        return settled;
+        await closeApproval(tx, loaded.value, {
+          status: "FAILED",
+          kind: "FAILED",
+          summary: `Payment failed after World ID approval: ${settled.error}`,
+          failureReason: "PAYMENT_FAILED",
+          now,
+        });
+        return "payment_failed";
       }
       action.reasons = [
         ...action.reasons,
@@ -165,41 +464,10 @@ export async function resolveApproval(
       ];
     }
 
-    if (outcome === "reject") {
-      approval.status = "REJECTED";
-      action.status = "REJECTED";
-      await tx
-        .update(approvals)
-        .set({ status: "REJECTED" })
-        .where(eq(approvals.id, approval.id));
-      await tx
-        .update(actions)
-        .set({ status: "REJECTED" })
-        .where(eq(actions.id, action.id));
-      await recordAudit(tx, {
-        agentId: action.agentId,
-        actionRequestId: action.id,
-        approvalId: approval.id,
-        kind: "REJECTED",
-        summary: `Rejected ${approval.reason}`,
-        createdAt: now,
-      });
-      console.log(`${action.agentId} approval ${approval.id} -> REJECTED`);
-      return { ok: true, value: { approval, action } };
-    }
-
-    const execution = await saveExecution(
-      tx,
-      action.id,
-      now,
-      action.action === "X402_PAYMENT",
-    );
-    approval.status = "APPROVED";
-    action.status = "EXECUTED";
-    action.executionId = execution.id;
+    const execution = await saveExecution(tx, action.id, now, paid);
     await tx
       .update(approvals)
-      .set({ status: "APPROVED" })
+      .set({ status: "APPROVED", worldAuthTime: identity.authTime })
       .where(eq(approvals.id, approval.id));
     await tx
       .update(actions)
@@ -214,10 +482,12 @@ export async function resolveApproval(
       actionRequestId: action.id,
       approvalId: approval.id,
       kind: "APPROVED",
-      summary: `Approved ${approval.reason}`,
+      summary: `Approved with a fresh World ID proof: ${approval.reason}`,
       createdAt: now,
     });
-    console.log(`${action.agentId} approval ${approval.id} -> APPROVED`);
-    return { ok: true, value: { approval, action } };
+    console.log(
+      `${action.agentId} approval ${approval.id} -> APPROVED with World ID`,
+    );
+    return paid ? "paid" : "approved";
   });
 }

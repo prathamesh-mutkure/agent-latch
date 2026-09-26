@@ -38,7 +38,7 @@ From `planning.md`, treated as closed:
 - One asset: Circle USDC at `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238`, 6 decimals. Policy amounts are USDC and display as dollars. No price oracle.
 - x402 uses that same USDC on Sepolia (`ethereum-sepolia` / `eip155:11155111`). Coinbase's CDP facilitator does not list Ethereum Sepolia. Use a facilitator that does. Do not add Base to follow the CDP list.
 - The background agent polls the API until an approval is approved, rejected, or expired. No websockets.
-- No login in Phase 1. A wallet-signed owner session comes when the dashboard needs an owner. World ID stays the Phase 5 step-up for exceptional actions, not the login.
+- No login in Phase 1. A wallet-signed owner session comes when the dashboard needs an owner. World ID stays the Phase 5 step-up for exceptional actions, not the login. Superseded by "World ID for Agents" below.
 - The repo is public and open source. Do not add a license file unless a sponsor form requires one.
 - `AGENTS.md` is the agent entrypoint for Cursor and Codex. `CLAUDE.md` only pulls in `AGENTS.md` for Claude Code. Do not keep a second copy of the rules.
 
@@ -131,6 +131,33 @@ Supersedes the parts of `planning-v2.md` that use Base, a Hono seller service, d
 - `POST /agents/:id/ens` deploys one Permissioned Resolver for the signer when needed, points the name at it, and writes the signer's ETH address with `setAddress`. A name that is already registered is updated instead of registered again.
 - `submitAction` records `BLOCK` when the name is not `REGISTERED` or is expired. An ENS read failure returns 503 and does not execute. Approve uses the same check before execution.
 - Policy still comes from Postgres. Policy text records are not written.
+
+## 2026-09-26 — World ID for Agents
+
+Supersedes the login bullet in "Hackathon constraints" and closes "World approval shape" in `open-questions.md`. Follows the World sections of `AgentPass — Technical Architecture.md`, with the corrections in `world-handover.md`.
+
+- World ID for Agents (OIDC, `https://sandbox.auth.world.org`) is the owner login and the step-up. One confidential client, `client_secret_basic`, all OIDC work on the API with `openid-client` v6. No IDKit, no World code in the browser.
+- `@agentlatch/world` in `packages/integrations/world` holds discovery, the authorize URL, the code exchange, `computeBindingHash`, and the pure `checkApprovalTicket`. It imports no database, Elysia, policy, executor, or signer code.
+- Sign-in stores `(world_iss, world_sub)` in `users` and sets a signed, http-only `SameSite=Lax` session cookie (`COOKIE_SECRET`). `sub` never goes onchain.
+- An agent's owner is `agents.user_id`. Agents created from a session get it. An unowned agent, such as the background agent's `trader`, is claimed with `POST /agents/:id/claim`.
+- `POST /approvals/:id/approve` is removed. Approve is only `GET /auth/world/step-up?approval=:id`, which reruns sign-in with `max_age=0`, `acr_values=https://world.org/oidc/acr/orb-v3`, and `nonce = binding_hash`. The callback runs the checks, then executes through the existing settle path.
+- Checks, in order: pending, not expired, stored hash = recomputed hash = cookie nonce (`BINDING`), token `(iss, sub)` is the owner (`WRONG_HUMAN`), `auth_time` within `step_up_started_at` − 30 s and now + 30 s (`STALE_VERIFICATION`). A failure sets approval `FAILED` with `failure_reason`. A settlement failure is `FAILED: PAYMENT_FAILED`.
+- `binding_hash = sha256(approvalId | agentId | action | target | token | amount | nonce | expiresAt)`, stored when the approval opens.
+- Deny is `POST /approvals/:id/deny`, owner session required. It sets `REJECTED`. Cancelling on the World screen sets `CANCELLED`. Superseded by "Deny needs World ID too" below.
+- Approvals expire after 5 minutes, per the architecture doc.
+- Local callback is `https://app.agentlatch.test:5173/auth/world/callback`. Vite proxies `/auth` and `/api` (prefix stripped) to the API, so the page, API, and callback share one origin. The API routes keep their names without an `/api` prefix.
+- Freshness is checked against `step_up_started_at`, not approval creation as the architecture doc says. World's step-up guide ties `auth_time` to the attempt start for `max_age=0`.
+- Agent-facing reads (`GET /approvals`, `GET /approvals/:id`) stay open because the background agent polls them.
+
+## 2026-09-26 — Deny needs World ID too
+
+Supersedes the deny bullet in "World ID for Agents".
+
+- Deny needs the same fresh World ID step-up as approve: `GET /auth/world/step-up?approval=:id&decision=deny`. `POST /approvals/:id/deny` is removed. No route changes an approval without a World ticket.
+- The step-up nonce binds the decision: approve uses `binding_hash`, deny uses `sha256(binding_hash|deny)`. A proof made for one decision fails the other with `BINDING`.
+- A validated deny sets `REJECTED` and records `world_auth_time`. The same checks apply, so a deny from another World account is `FAILED: WRONG_HUMAN`.
+- Backing out of World during a deny leaves the approval `PENDING`. Backing out during an approve still sets `CANCELLED`.
+- After the World checks pass, approve runs the ENS passport check from "ENS name gates actions" before executing. A missing or expired name sets `FAILED: PASSPORT_INACTIVE`. An ENS read failure executes nothing and leaves the approval `PENDING`.
 
 ## How to change a decision
 

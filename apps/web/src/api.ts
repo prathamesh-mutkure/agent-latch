@@ -3,7 +3,11 @@ import {
   createAgentLatchClient,
 } from "@agentlatch/api-client";
 
-export const client: AgentLatchClient = createAgentLatchClient();
+// Same origin as the page: Vite proxies /api to the API, so the World session
+// cookie is first-party and sent with every call.
+export const client: AgentLatchClient = createAgentLatchClient(
+  `${window.location.origin}/api`,
+);
 
 type CallResult<T> = {
   data: T | null;
@@ -88,12 +92,40 @@ export async function getPolicy(agentId: string) {
   return data;
 }
 
-export function approveApproval(approvalId: string) {
-  return read(client.approvals({ approvalId }).approve.post());
+export async function getApproval(approvalId: string) {
+  const data = await read(client.approvals({ approvalId }).get());
+  if (isErrorBody(data)) {
+    throw new Error(data.error);
+  }
+  return data;
 }
 
-export function rejectApproval(approvalId: string) {
-  return read(client.approvals({ approvalId }).reject.post());
+// Approve and deny are not API calls. Each is a full-page redirect to World ID:
+// /auth/world/step-up?approval=:id&decision=approve|deny. The server applies
+// the decision only after it checks the fresh World ID ticket.
+
+export async function getMe() {
+  const result = await client.me.get();
+  if (result.status === 401) {
+    return null;
+  }
+  const data = await read(Promise.resolve(result));
+  if (isErrorBody(data)) {
+    throw new Error(data.error);
+  }
+  return data;
+}
+
+export async function signOut() {
+  await fetch("/auth/logout", { method: "POST" });
+}
+
+export async function claimAgent(agentId: string) {
+  const data = await read(client.agents({ agentId }).claim.post());
+  if (isErrorBody(data)) {
+    throw new Error(data.error);
+  }
+  return data;
 }
 
 export type AgentRecord = Awaited<ReturnType<typeof listAgents>>[number];

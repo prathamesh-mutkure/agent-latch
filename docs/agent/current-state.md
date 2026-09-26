@@ -6,7 +6,7 @@ Rewrite the row you changed. Do not append a diary. Commands live in `commands.m
 
 ## In progress
 
-- World ID, phase 5, in `packages/integrations/world`. Ankit. The approval shape is open in `open-questions.md`. Read `planning-v2.md` and `continuation.md`. Leave that package alone.
+- World ID, phase 5. Code is in. The live sandbox round trip waits on registering the client and setting `WORLD_CLIENT_ID`, `WORLD_CLIENT_SECRET`, `WORLD_REDIRECT_URI`, and `COOKIE_SECRET`. See `world-handover.md`.
 
 ## Todos
 
@@ -18,7 +18,7 @@ Rewrite the row you changed. Do not append a diary. Commands live in `commands.m
 | 3 | Background agent | done | passed | 100 allow, 2500 waits, 10000 block |
 | 4 | ENSv2 | done | passed | `trader.agent-latch.eth` registered |
 | 7 | Dashboard | done | passed | `apps/web`. Eden client in `packages/api-client` |
-| 5 | World ID for Agents | in progress | not started | Ankit. `packages/integrations/world`. Shape is open in `open-questions.md` |
+| 5 | World ID for Agents | in progress | partial | `@agentlatch/world`, `modules/auth`, owner claim, `/approve/:id`. Approve and deny only via World step-up. Live sandbox round trip not run yet |
 | 6 | Intercepta + x402 | done | passed | Quick scan and a signed Sepolia USDC settlement |
 | later | ENS gate and resolver | done | passed | Missing or expired name blocks the action. `trader.agent-latch.eth` resolver `0xe71b020df50c07DAcE858f47BaC4341f82c82001`, ETH address `0x142B99367b928608835501633534411EFc467737`. Policy stays in Postgres |
 | last | Policy on ENS | todo | not started | Publish rules onto ENS. A looser edit needs a fresh approval. Tighter edits write immediately |
@@ -26,7 +26,7 @@ Rewrite the row you changed. Do not append a diary. Commands live in `commands.m
 | 9 | Uniswap | todo | not started | Optional, last |
 | 10 | Hackathon polish | todo | not started | |
 
-Empty on purpose: `db/seed`, `packages/executors/api`, `packages/integrations/world`, `apps/world-miniapp`, `packages/executors/uniswap`, `packages/signers/alchemy`, `packages/sdk`, `packages/contracts`, `contracts/`.
+Empty on purpose: `db/seed`, `packages/executors/api`, `apps/world-miniapp`, `packages/executors/uniswap`, `packages/signers/alchemy`, `packages/sdk`, `packages/contracts`, `contracts/`.
 
 ## Testing
 
@@ -42,6 +42,9 @@ No unit test suite. Checks are `bun run typecheck` and `bun run lint`.
 | `POST /agents/:id/ens` creates `trader.agent-latch.eth` | done | `REGISTERED`, owner `0x142B99367b928608835501633534411EFc467737`, registry `0xE48a112cCd94F06D316c32E911D752478d4E1236`. Resolver `0xe71b020df50c07DAcE858f47BaC4341f82c82001`. ETH address `0x142B99367b928608835501633534411EFc467737` |
 | Dashboard pages and reject | done | Overview, agent, policies, activity, approvals, and payments render against the live API. Reject on the pending 2500 USDC swap returned `REJECTED` and the audit line showed up. Approve uses the same control. A later 2500 approval was left pending |
 | Intercepta quick scan on `X402_PAYMENT` | done | $1 to `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045` allowed, toxic score 0, simulated execution. $1 to `0x098B716B8Aaf21512996dC57EB0615e2383E2f96` blocked, toxic score 100, no execution. A payee the API does not know returns 404 and the payment is refused |
+| World step-up checks against Postgres | done | Scratch script with a stand-in World identity: second sign-in reuses the `users` row; claim, and a second owner gets 409; approve → `APPROVED`; replay → not pending; other `sub` → `FAILED: WRONG_HUMAN`; old `auth_time` → `FAILED: STALE_VERIFICATION`; amount edited in SQL → `FAILED: BINDING`; stranger step-up 403; cancel → `CANCELLED`; past expiry → `EXPIRED`. Deny with World → `REJECTED`; a deny proof used to approve, or the reverse → `FAILED: BINDING`; deny by another `sub` → `FAILED: WRONG_HUMAN`; backing out of deny keeps `PENDING`. Rows removed afterwards |
+| World routes without a client | done | `/auth/world/login` 503, `/me` 401, `POST /approvals/:id/approve` and `/deny` 404. Same through the Vite proxy on 5173. Authorize URL built from live sandbox discovery carries `max_age=0`, orb-v3 `acr_values`, S256 PKCE |
+| World sign-in and step-up with the sandbox | todo | Needs a registered client. Run the ten acceptance tests in `world-handover.md` |
 | x402 USDC settlement on Sepolia | done | `GET /x402/resource` is 402. `0.01` USDC to `0x142B99367b928608835501633534411EFc467737` allowed, Intercepta score 0, signed execution, tx `0x22d690597c411be1aebb8c98e508852ae407dfb7df5d8c4bec2772315d956f22`. The same URL with `?tx=` returns 200 |
 
 ## Notes
@@ -52,5 +55,5 @@ No unit test suite. Checks are `bun run typecheck` and `bun run lint`.
 - Sepolia demo signer: `0x142B99367b928608835501633534411EFc467737`. Parent name: `agent-latch.eth`.
 - `POST /agents/:id/ens` deploys a UserRegistry under `ENS_PARENT_NAME` when needed, then registers the agent label, points it at the signer's Permissioned Resolver, and writes the signer's ETH address. A name that is already registered is updated. The signer must be the parent owner and hold Sepolia ETH. An action is blocked when that name is missing or expired.
 - Swaps stay unsigned. An x402 settlement signs and broadcasts. Policy stays free of sponsors.
-- The dashboard polls the API. The API allows the dashboard origin. Approve and reject response bodies are unchanged.
+- The dashboard polls the API through the Vite proxy (`/api`, prefix stripped; `/auth` as is). Approve is a redirect to `/auth/world/step-up?approval=:id`. Deny is the same redirect with `&decision=deny`. Approvals expire after 5 minutes.
 - The payments page lists `X402_PAYMENT` actions. Each one is quick-scanned before execution. A clear scan settles Circle USDC with EIP-3009. The signer pays Sepolia gas. A missing key, a 404 from the scan, or a failed settlement refuses the payment. Live traits may omit `txsCount`.

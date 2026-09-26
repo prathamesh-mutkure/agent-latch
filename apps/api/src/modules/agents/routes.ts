@@ -1,9 +1,11 @@
 import { Elysia, t } from "elysia";
 import { respond } from "../../result";
+import { session } from "../auth/session";
 import { toPolicyDto } from "./dto";
 import { readAgentEns, registerAgentEns } from "./ens";
 import { agentIdParams, createAgentBody, setPolicyBody } from "./schemas";
 import {
+  claimAgent,
   createAgent,
   getAgent,
   getPolicy,
@@ -16,9 +18,13 @@ async function agentWithEns<T extends { name: string }>(agent: T) {
 }
 
 export const agentsRoutes = new Elysia({ prefix: "/agents" })
-  .post("/", async ({ body }) => agentWithEns(await createAgent(body.name)), {
-    body: createAgentBody,
-  })
+  .use(session)
+  .post(
+    "/",
+    async ({ body, userId }) =>
+      agentWithEns(await createAgent(body.name, userId)),
+    { body: createAgentBody },
+  )
   .get("/", async () => {
     const agents = await listAgents();
     return Promise.all(agents.map((agent) => agentWithEns(agent)));
@@ -32,6 +38,21 @@ export const agentsRoutes = new Elysia({ prefix: "/agents" })
         return { error: "Agent not found." };
       }
       return agentWithEns(agent);
+    },
+    { params: agentIdParams },
+  )
+  .post(
+    "/:agentId/claim",
+    async ({ params, set, userId }) => {
+      if (!userId) {
+        set.status = 401;
+        return { error: "Sign in with World ID to claim an agent." };
+      }
+      const result = await claimAgent(params.agentId, userId);
+      if (!result.ok) {
+        return respond(set, result);
+      }
+      return agentWithEns(result.value);
     },
     { params: agentIdParams },
   )

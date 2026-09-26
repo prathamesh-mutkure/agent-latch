@@ -8,17 +8,21 @@ import {
   USDC_SEPOLIA_ADDRESS,
   UsdcAmountError,
 } from "@agentlatch/core";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../../db/client";
 import type { Failure, Success } from "../../result";
 import { recordAudit } from "../audit/service";
 import { toAgent, toPolicy } from "./dto";
 import { agents, policies } from "./schema";
 
-export async function createAgent(name: string): Promise<Agent> {
+export async function createAgent(
+  name: string,
+  userId: string | null = null,
+): Promise<Agent> {
   const agent: Agent = {
     id: crypto.randomUUID(),
     name: name.trim(),
+    userId,
     createdAt: new Date().toISOString(),
   };
   const createdAt = new Date(agent.createdAt);
@@ -26,6 +30,7 @@ export async function createAgent(name: string): Promise<Agent> {
     await tx.insert(agents).values({
       id: agent.id,
       name: agent.name,
+      userId,
       createdAt,
     });
     await recordAudit(tx, {
@@ -51,6 +56,42 @@ export async function getAgent(agentId: string): Promise<Agent | undefined> {
     .limit(1);
   const row = rows[0];
   return row ? toAgent(row) : undefined;
+}
+
+/** Gives an unowned agent to the signed-in owner. */
+export async function claimAgent(
+  agentId: string,
+  userId: string,
+): Promise<Success<Agent> | Failure> {
+  return db.transaction(async (tx) => {
+    const rows = await tx
+      .select()
+      .from(agents)
+      .where(eq(agents.id, agentId))
+      .limit(1)
+      .for("update");
+    const row = rows[0];
+    if (!row) {
+      return { ok: false, status: 404, error: "Agent not found." };
+    }
+    if (row.userId === userId) {
+      return { ok: true, value: toAgent(row) };
+    }
+    if (row.userId) {
+      return { ok: false, status: 409, error: "Agent has another owner." };
+    }
+    const claimed = await tx
+      .update(agents)
+      .set({ userId })
+      .where(and(eq(agents.id, agentId), isNull(agents.userId)))
+      .returning();
+    await recordAudit(tx, {
+      agentId,
+      kind: "AGENT_CLAIMED",
+      summary: `Agent ${row.name} claimed by its World ID owner.`,
+    });
+    return { ok: true, value: toAgent(claimed[0] ?? row) };
+  });
 }
 
 export async function getPolicy(agentId: string): Promise<Policy | undefined> {

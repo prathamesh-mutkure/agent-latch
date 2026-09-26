@@ -13,6 +13,7 @@ import { ActivityPage } from "./pages/activity";
 import { AgentPage } from "./pages/agent";
 import { AgentsPage } from "./pages/agents";
 import { ApprovalsPage } from "./pages/approvals";
+import { ApprovePage } from "./pages/approve";
 import { OverviewPage } from "./pages/overview";
 import { PaymentsPage } from "./pages/payments";
 import { PoliciesPage } from "./pages/policies";
@@ -58,6 +59,15 @@ const approvalsRoute = createRoute({
   component: ApprovalsPage,
 });
 
+const approveRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/approve/$approvalId",
+  validateSearch: (search: Record<string, unknown>): { result?: string } => ({
+    result: typeof search.result === "string" ? search.result : undefined,
+  }),
+  component: ApprovePage,
+});
+
 const paymentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/payments",
@@ -71,6 +81,7 @@ const routeTree = rootRoute.addChildren([
   policiesRoute,
   activityRoute,
   approvalsRoute,
+  approveRoute,
   paymentsRoute,
 ]);
 

@@ -16,7 +16,13 @@ export type ActionResult = {
 
 export type ApprovalResult = {
   id: string;
-  status: "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED" | "CANCELLED";
+  status:
+    | "PENDING"
+    | "APPROVED"
+    | "REJECTED"
+    | "EXPIRED"
+    | "CANCELLED"
+    | "FAILED";
 };
 
 type Health = {

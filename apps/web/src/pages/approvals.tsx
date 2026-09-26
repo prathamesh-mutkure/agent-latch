@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import type { ActionRecord, AgentRecord, ApprovalRecord } from "../api";
 import { useAgents, useAllActions, useApprovals } from "../hooks";
 import { formatDollars, formatExpiry, formatWhen } from "../model";
@@ -21,7 +22,7 @@ export function ApprovalsPage() {
     <>
       <PageHeader
         title="Pending approvals"
-        detail="Approve or reject one action. A second decision on the same approval is refused."
+        detail="Approve and deny each ask for a fresh World ID proof from the agent's owner, bound to that one decision."
       />
       <QueryGate
         isPending={approvals.isPending}
@@ -55,6 +56,9 @@ export function ApprovalsPage() {
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <Pill>{approval.status}</Pill>
+                    {approval.failureReason ? (
+                      <Pill>{approval.failureReason}</Pill>
+                    ) : null}
                     <p className="font-medium">
                       {approval.action} {formatDollars(approval.amountUsdc)}
                     </p>
@@ -90,6 +94,14 @@ function ApprovalCard({
       <div className="flex flex-wrap items-center gap-3">
         <Pill>PENDING</Pill>
         <h2 className="text-2xl font-semibold tabular-nums">{label}</h2>
+        <Link
+          to="/approve/$approvalId"
+          params={{ approvalId: approval.id }}
+          search={{}}
+          className="ml-auto text-sm underline"
+        >
+          Details
+        </Link>
       </div>
       <p className="mt-3 text-sm">
         {agent?.ens.name ?? agent?.name ?? approval.agentId}

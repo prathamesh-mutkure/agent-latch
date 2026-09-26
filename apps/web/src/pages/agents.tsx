@@ -1,5 +1,7 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useAgents, useAllActions } from "../hooks";
+import { claimAgent } from "../api";
+import { useAgents, useAllActions, useMe } from "../hooks";
 import { agentPosture } from "../model";
 import { Empty, PageHeader, Pill, QueryGate } from "../ui";
 
@@ -8,6 +10,7 @@ export function AgentsPage() {
   const agentIds = agents.data?.map((agent) => agent.id) ?? [];
   const actionQueries = useAllActions(agentIds);
   const actions = actionQueries.flatMap((query) => query.data ?? []);
+  const me = useMe();
 
   return (
     <>
@@ -54,6 +57,14 @@ export function AgentsPage() {
                         : "No roles granted"}
                     </p>
                   </Link>
+                  {me.data && !agent.userId ? (
+                    <ClaimButton agentId={agent.id} />
+                  ) : null}
+                  {me.data && agent.userId === me.data.id ? (
+                    <p className="mt-2 text-xs text-muted">
+                      You own this agent.
+                    </p>
+                  ) : null}
                 </li>
               );
             })}
@@ -61,5 +72,34 @@ export function AgentsPage() {
         )}
       </QueryGate>
     </>
+  );
+}
+
+export function ClaimButton({ agentId }: { agentId: string }) {
+  const queryClient = useQueryClient();
+  const claim = useMutation({
+    mutationFn: () => claimAgent(agentId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries();
+    },
+  });
+  return (
+    <div className="mt-2 flex items-center gap-3">
+      <button
+        type="button"
+        className="rounded-md border border-ink px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+        disabled={claim.isPending}
+        onClick={() => claim.mutate()}
+      >
+        {claim.isPending ? "Claiming…" : "Claim as owner"}
+      </button>
+      {claim.error ? (
+        <p role="alert" className="text-sm text-block">
+          {claim.error instanceof Error
+            ? claim.error.message
+            : "Request failed."}
+        </p>
+      ) : null}
+    </div>
   );
 }

@@ -15,7 +15,7 @@ bun run dev
 
 The API applies database migrations on startup. More commands, including how to run the agent alone, are in [`docs/agent/commands.md`](docs/agent/commands.md).
 
-- Web: http://localhost:5173
+- Web: https://localhost:5173, or https://app.agentlatch.test:5173 after adding `127.0.0.1 app.agentlatch.test` to `/etc/hosts`. The certificate is self-signed.
 - API health: http://localhost:3001/health
 - Agent: background process started by `bun run dev`
 

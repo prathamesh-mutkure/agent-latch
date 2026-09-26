@@ -1,6 +1,6 @@
 export type Failure = {
   ok: false;
-  status: 400 | 403 | 404 | 409 | 503;
+  status: 400 | 401 | 403 | 404 | 409 | 503;
   error: string;
 };
 

@@ -1,6 +1,8 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
 import {
+  getApproval,
   getHealth,
+  getMe,
   getPolicy,
   listActions,
   listAgents,
@@ -100,5 +102,23 @@ export function useAllPolicies(agentIds: string[]) {
       refetchInterval: 8_000,
       ...live,
     })),
+  });
+}
+
+export function useMe() {
+  return useQuery({
+    queryKey: ["me"],
+    queryFn: getMe,
+    refetchInterval: 30_000,
+    ...live,
+  });
+}
+
+export function useApproval(approvalId: string) {
+  return useQuery({
+    queryKey: ["approval", approvalId],
+    queryFn: () => getApproval(approvalId),
+    refetchInterval: 2_000,
+    ...live,
   });
 }

@@ -17,11 +17,11 @@ Do not close these in code until he writes the choice in `decisions.md`.
 
 **Signer custody.** The code signs with one `LocalKeySigner` (`EXECUTOR_PRIVATE_KEY`) and an exact EIP-3009 slip, then that same key broadcasts the Sepolia transaction. His spec uses a wallet per agent, encrypted at rest. Either can be the end state. Leave `packages/signers/local` and `packages/executors/x402` in place until he decides.
 
-**World approval shape.** `POST /approvals/:id/approve` executes with no World ticket. For an `X402_PAYMENT`, that path settles USDC in `apps/api/src/modules/approvals/service.ts`. Phase 5 is his, in `packages/integrations/world` (still empty). He decides how a World result proves that one approval, including whether World also becomes the owner session. The existing decision says World is the step-up, not the login. He supersedes that decision if the proof should include login.
+**World approval shape.** Closed on 2026-09-26 in `decisions.md` ("World ID for Agents"). World is the login and the step-up.
 
 ## Step order
 
-1. Phase 5. World check on the existing approval path. Leave the signer alone.
+1. Phase 5. World check on the existing approval path. Leave the signer alone. Built; the live sandbox round trip waits on client registration.
 2. Custody. No code until the open question is closed.
 3. Done. An action is refused when the ENS name is missing or expired. Registration sets the resolver and the ETH address. Policy rows stay in Postgres.
 4. Last: publish policy onto ENS records. A looser policy edit needs a fresh approval. Tighter edits can keep writing immediately.
