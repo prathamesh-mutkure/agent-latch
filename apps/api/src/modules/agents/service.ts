@@ -13,6 +13,7 @@ import { generateAgentKey } from "../../agent-key";
 import { db } from "../../db/client";
 import type { Failure, Success } from "../../result";
 import { recordAudit } from "../audit/service";
+import { users } from "../users/schema";
 import { toAgent, toPolicy } from "./dto";
 import {
   loadPolicyTexts,
@@ -34,15 +35,26 @@ function isUniqueViolation(error: unknown): boolean {
   return false;
 }
 
-/** An agent belongs to the owner who created it. The key is returned once. */
+/**
+ * An agent belongs to the owner who created it. The key is returned once. It
+ * lives under the owner's username when they have one.
+ */
 export async function createAgent(
-  name: string,
+  input: { name: string; authAddress?: string },
   userId: string,
 ): Promise<Success<{ agent: Agent; key: string }> | Failure> {
   const { key, hash } = generateAgentKey();
+  const owner = await db
+    .select({ username: users.username })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const name = input.name;
   const agent: Agent = {
     id: crypto.randomUUID(),
     name,
+    username: owner[0]?.username ?? null,
+    authAddress: input.authAddress?.toLowerCase() ?? null,
     userId,
     hasKey: true,
     createdAt: new Date().toISOString(),
@@ -53,6 +65,8 @@ export async function createAgent(
       await tx.insert(agents).values({
         id: agent.id,
         name: agent.name,
+        username: agent.username,
+        authAddress: agent.authAddress,
         userId,
         keyHash: hash,
         createdAt,
@@ -219,7 +233,7 @@ export async function setPolicy(
     updatedAt: updatedAt.toISOString(),
   };
 
-  const identity = await readAgentEns(agent.name);
+  const identity = await readAgentEns(agent);
   if (identity.status === "UNAVAILABLE") {
     return {
       ok: false,
@@ -243,7 +257,7 @@ export async function setPolicy(
     }
     if (change === "tighter") {
       try {
-        await publishPolicyRecords(agent.name, policyRecords(policy));
+        await publishPolicyRecords(agent, policyRecords(policy));
       } catch (error) {
         return {
           ok: false,

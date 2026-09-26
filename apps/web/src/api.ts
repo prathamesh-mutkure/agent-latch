@@ -2,6 +2,7 @@ import {
   type AgentLatchClient,
   createAgentLatchClient,
 } from "@agentlatch/api-client";
+import type { ActionType } from "@agentlatch/core";
 import { clearSession, currentSession } from "./session";
 import type { SignedWalletAuth } from "./world";
 
@@ -57,12 +58,25 @@ export function getHealth() {
   return read(client.health.get());
 }
 
-export async function createAgent(name: string): Promise<{
+export type NewAgent = {
+  name: string;
+  /** The agent's own signing address. Becomes the name's ETH record. */
+  authAddress?: string;
+  policy: {
+    autonomousLimit: string;
+    hardLimit: string;
+    dailyLimit?: string;
+    allowedActions: ActionType[];
+    allowedTargets: string[];
+  };
+};
+
+export async function createAgent(input: NewAgent): Promise<{
   id: string;
   key: string;
   setupError: string | null;
 }> {
-  const data: unknown = await read(client.agents.post({ name }));
+  const data: unknown = await read(client.agents.post(input));
   if (
     typeof data !== "object" ||
     data === null ||
@@ -80,6 +94,15 @@ export async function createAgent(name: string): Promise<{
         ? data.setupError
         : null,
   };
+}
+
+/** Sets the owner's username once. New agents are named under it. */
+export async function setUsername(username: string) {
+  const data = await read(client.me.username.put({ username }));
+  if (isErrorBody(data)) {
+    throw new Error(data.error);
+  }
+  return data;
 }
 
 export async function issueAgentKey(agentId: string): Promise<{ key: string }> {

@@ -27,3 +27,12 @@ export const agentId =
   process.env.AGENTLATCH_AGENT_ID || process.env.AGENT_ID || undefined;
 /** Shown once on the agent's page. Sent as `x-agent-key`. */
 export const agentKey = process.env.AGENT_KEY?.trim() || undefined;
+/**
+ * Signs action requests when set. Its address is the agent's authAddress, and
+ * `AGENTLATCH_AGENT_ENS` is the agent's ENS name, as the dashboard shows it.
+ */
+export const agentPrivateKey = process.env.AGENT_PRIVATE_KEY as
+  | `0x${string}`
+  | undefined;
+export const agentEnsName =
+  process.env.AGENTLATCH_AGENT_ENS?.trim() || undefined;

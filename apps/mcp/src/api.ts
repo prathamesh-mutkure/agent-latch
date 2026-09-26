@@ -1,4 +1,19 @@
-import { agentId, agentKey, apiUrl } from "./env";
+import {
+  AGENT_ID_HEADER,
+  AGENT_NONCE_HEADER,
+  AGENT_SIGNATURE_HEADER,
+  AGENT_TIMESTAMP_HEADER,
+  agentRequestMessage,
+  sha256Hex,
+} from "@agentlatch/core";
+import { privateKeyToAccount } from "viem/accounts";
+import {
+  agentEnsName,
+  agentId,
+  agentKey,
+  agentPrivateKey,
+  apiUrl,
+} from "./env";
 
 export type Merchant = {
   id: string;
@@ -74,24 +89,70 @@ function currentAgentId(): string {
   return agentId;
 }
 
+/** ENS signature headers, or none when no signing key is configured. */
+async function signedHeaders(
+  method: string,
+  path: string,
+  body: string,
+): Promise<Record<string, string>> {
+  if (!agentPrivateKey) {
+    return {};
+  }
+  if (!agentEnsName) {
+    throw new ApiError(
+      "Set AGENTLATCH_AGENT_ENS to sign with AGENT_PRIVATE_KEY.",
+    );
+  }
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const nonce = crypto.randomUUID();
+  const message = agentRequestMessage({
+    agentId: agentEnsName,
+    method,
+    path,
+    timestamp,
+    nonce,
+    bodySha256: await sha256Hex(body),
+  });
+  return {
+    [AGENT_ID_HEADER]: agentEnsName,
+    [AGENT_TIMESTAMP_HEADER]: timestamp,
+    [AGENT_NONCE_HEADER]: nonce,
+    [AGENT_SIGNATURE_HEADER]: await privateKeyToAccount(
+      agentPrivateKey,
+    ).signMessage({ message }),
+  };
+}
+
 export function listMerchants(): Promise<Merchant[]> {
   return request<Merchant[]>("/x402/merchants");
 }
 
-export async function submitPayment(input: {
+/** Sends the agent key, and the ENS signature when a signing key is set. */
+async function submitAction(action: {
+  action: string;
+  target: string;
+  amount: string;
+  note?: string;
+}): Promise<Action> {
+  const path = `/agents/${currentAgentId()}/actions`;
+  const body = JSON.stringify(action);
+  return request<Action>(path, {
+    method: "POST",
+    headers: await signedHeaders("POST", path, body),
+    body,
+  });
+}
+
+export function submitPayment(input: {
   url: string;
   amountUsdc: string;
   note?: string;
 }): Promise<Action> {
-  const id = currentAgentId();
-  return request<Action>(`/agents/${id}/actions`, {
-    method: "POST",
-    body: JSON.stringify({
-      action: "X402_PAYMENT",
-      target: input.url,
-      amount: input.amountUsdc,
-      note: input.note,
-    }),
+  return submitAction({
+    action: "X402_PAYMENT",
+    target: input.url,
+    amount: input.amountUsdc,
+    note: input.note,
   });
 }
 
@@ -104,15 +165,11 @@ export function submitSwap(input: {
   amountUsdc: string;
   note?: string;
 }): Promise<Action> {
-  const id = currentAgentId();
-  return request<Action>(`/agents/${id}/actions`, {
-    method: "POST",
-    body: JSON.stringify({
-      action: "SWAP",
-      target: "0xvenue",
-      amount: input.amountUsdc,
-      note: input.note,
-    }),
+  return submitAction({
+    action: "SWAP",
+    target: "0xvenue",
+    amount: input.amountUsdc,
+    note: input.note,
   });
 }
 

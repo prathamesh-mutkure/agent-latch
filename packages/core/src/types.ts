@@ -28,6 +28,13 @@ export type ApprovalStatus =
 export type Agent = {
   id: string;
   name: string;
+  /**
+   * Owner's ENS label. The agent id is `name.username.<parent>`. Null for
+   * agents created before the owner set one, which keep `name.<parent>`.
+   */
+  username: string | null;
+  /** Address the agent signs requests with. Written as the name's ETH record. */
+  authAddress: string | null;
   /** Owner who approves this agent's exceptional actions. Null only for agents made before owner accounts. */
   userId: string | null;
   /** Whether an agent key has been issued. The key itself is never on this object. */

@@ -372,7 +372,7 @@ function shortWallet(wallet: string): string {
 async function passportGate(agentId: string, now: Date) {
   const agent = await getAgent(agentId);
   return agent
-    ? readPassportGate(agent.name, now)
+    ? readPassportGate(agent, now)
     : ({ state: "inactive", reason: "Agent not found." } as const);
 }
 

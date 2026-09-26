@@ -291,6 +291,17 @@ Supersedes the open action routes in "Owner accounts" and the "no agent keys yet
 - Agents created before this, including `pilot`, have no key until the owner creates one on the agent's page.
 - `apps/mcp` also gained `request_swap`, `wait_for_approval` (polls for 45 seconds), `get_policy`, and `recent_activity`.
 
+## 2026-09-27 — Agent ids are ENS names, and agents with an ENS key sign submits
+
+Builds on "Agent keys". Supersedes nothing there: the agent key stays required.
+
+- An agent's id is its ENS name, `name.username.<parent>`, for example `trader.alice.agent-latch.eth`. Agents created before the owner set a username keep `name.<parent>`.
+- The owner's username is `users.username`, an ENS label with the same rules as agent names, unique, set once with `PUT /me/username` (signed in). `POST /agents` copies it onto the agent. Names stay unique ignoring case across all owners (migration 0005), so the username adds a namespace, not free names.
+- `POST /agents` takes an optional `authAddress`, an address whose private key only the agent holds. `POST /agents/:id/ens` registers `username.<parent>` first when it is missing (owned by the executor key), then the agent name with `authAddress` as its ETH record. The `alk_` key is a bearer secret the API issued. The `authAddress` key is what the agent's ENS name says it is.
+- `POST /agents/:id/actions` checks the agent key first. An agent with an `authAddress` must also send `x-agentlatch-agent` (the ENS name), `-timestamp` (unix seconds, 60 seconds each way), `-nonce`, and `-signature`: an EIP-191 signature over `agentRequestMessage` in `@agentlatch/core`, which covers method, path with query, and the body's SHA-256. Reads follow "Agent keys".
+- The API checks the signature against `authAddress` in Postgres, not by reading the ENS record on every request. Used nonces are held in memory, so one API process only. Migration 0007.
+- `apps/mcp` signs its submits when `AGENT_PRIVATE_KEY` and `AGENTLATCH_AGENT_ENS` are set, next to `AGENT_KEY`. `GET /agents/:id` is owner only, so the name comes from `.env`. That key only signs requests. It never signs a payment.
+
 ## How to change a decision
 
 Add a new dated section that names what it supersedes. Leave the old section in place and mark it superseded.

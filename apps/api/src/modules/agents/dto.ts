@@ -9,6 +9,8 @@ export function toAgent(row: AgentRow): Agent {
   return {
     id: row.id,
     name: row.name,
+    username: row.username,
+    authAddress: row.authAddress,
     userId: row.userId,
     hasKey: row.keyHash !== null,
     createdAt: row.createdAt.toISOString(),

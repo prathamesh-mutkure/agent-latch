@@ -1,5 +1,5 @@
 import type { Failure } from "../../result";
-import { readAgentEns } from "./ens";
+import { type AgentName, readAgentEns } from "./ens";
 
 export type PassportGate =
   | { state: "active"; name: string }
@@ -8,10 +8,10 @@ export type PassportGate =
 
 /** Identity check only. The spending decision reads the name's text records. */
 export async function readPassportGate(
-  label: string,
+  agent: AgentName,
   now: Date,
 ): Promise<PassportGate> {
-  const identity = await readAgentEns(label);
+  const identity = await readAgentEns(agent);
   if (identity.status === "UNAVAILABLE") {
     return {
       state: "unread",

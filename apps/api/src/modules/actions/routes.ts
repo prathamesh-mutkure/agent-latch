@@ -1,6 +1,11 @@
 import { Elysia } from "elysia";
 import { readAgentAccess } from "../../agent-key";
 import { respond } from "../../result";
+import {
+  parseJsonKeepingRaw,
+  verifyAgentRequest,
+} from "../agents/request-auth";
+import { getAgent } from "../agents/service";
 import { type ActionDto, toActionDto } from "./dto";
 import { actionIdParams, agentIdParams, submitActionBody } from "./schemas";
 import { getAction, listActions, submitAction } from "./service";
@@ -9,10 +14,20 @@ export const actionRoutes = new Elysia()
   // Submitting spends, so it takes the agent key. The owner session is not enough.
   .post(
     "/agents/:agentId/actions",
-    async ({ params, body, headers, set }) => {
+    async ({ params, body, headers, request, set }) => {
       const access = await readAgentAccess(params.agentId, headers, "key");
       if (!access.ok) {
         return respond(set, access);
+      }
+      const agent = await getAgent(params.agentId);
+      if (!agent) {
+        set.status = 404;
+        return { error: "Agent not found." };
+      }
+      // An agent with an ENS auth address also signs, on top of its key.
+      const denied = await verifyAgentRequest(request, agent);
+      if (denied) {
+        return respond(set, denied);
       }
       const result = await submitAction({
         agentId: params.agentId,
@@ -30,6 +45,7 @@ export const actionRoutes = new Elysia()
     {
       params: agentIdParams,
       body: submitActionBody,
+      parse: parseJsonKeepingRaw,
     },
   )
   .get(

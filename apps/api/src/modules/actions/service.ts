@@ -81,7 +81,7 @@ export async function submitAction(input: {
   const now = new Date();
   const token = (input.token ?? USDC_SEPOLIA_ADDRESS).toLowerCase();
   const target = input.target.trim();
-  const passport = await readPassportGate(agent.name, now);
+  const passport = await readPassportGate(agent, now);
   if (passport.state === "unread") {
     return { ok: false, status: 503, error: passport.error };
   }

@@ -32,14 +32,23 @@ import {
   writePolicyRecords,
 } from "./resolver";
 
-function parentLabelOf(parentName: string): string {
+/** Labels of a parent name below `.eth`, nearest first. */
+function parentLabelsOf(parentName: string): string[] {
   const normalized = parentName.trim().toLowerCase();
   if (!normalized.endsWith(".eth")) {
     throw new Error("ENS parent name must end in .eth.");
   }
-  const label = normalized.slice(0, -".eth".length);
-  if (!/^[a-z0-9-]+$/.test(label) || label.includes(".")) {
-    throw new Error("ENS parent must be a single .eth label for now.");
+  const labels = normalized.slice(0, -".eth".length).split(".");
+  if (labels.some((label) => !/^[a-z0-9-]+$/.test(label))) {
+    throw new Error("ENS parent name has an invalid label.");
+  }
+  return labels;
+}
+
+function parentLabelOf(parentName: string): string {
+  const [label] = parentLabelsOf(parentName);
+  if (!label) {
+    throw new Error("ENS parent name has no label.");
   }
   return label;
 }
@@ -62,6 +71,27 @@ async function subregistryOf(
     functionName: "getSubregistry",
     args: [parentLabel],
   });
+}
+
+/**
+ * Walks down from the root registry to the registry that holds the parent's
+ * own label. For `alice.agent-latch.eth` that is the subregistry of
+ * `agent-latch.eth`. Returns the zero address when a level is missing.
+ */
+async function registryHolding(
+  rpcUrl: string,
+  root: Address,
+  parentName: string,
+): Promise<Address> {
+  const above = parentLabelsOf(parentName).slice(1).reverse();
+  let registry = root;
+  for (const label of above) {
+    registry = await subregistryOf(rpcUrl, registry, label);
+    if (registry === zeroAddress) {
+      return zeroAddress;
+    }
+  }
+  return registry;
 }
 
 async function deployUserRegistry(input: {
@@ -145,13 +175,16 @@ export async function registerUnderParent(input: {
   label: string;
   privateKey: Hex;
   owner?: string;
+  /** ETH address record. Defaults to the registering key. */
+  address?: string;
   rpcUrl?: string;
+  /** Root registry. The parent name may sit several levels below it. */
   parentRegistry?: string;
   records?: { key: string; value: string }[];
 }): Promise<EnsIdentity> {
   const rpcUrl = input.rpcUrl ?? sepoliaEns.defaultRpcUrl;
-  const parentRegistry = input.parentRegistry ?? sepoliaEns.ethRegistry;
-  if (!isAddress(parentRegistry)) {
+  const root = input.parentRegistry ?? sepoliaEns.ethRegistry;
+  if (!isAddress(root)) {
     throw new Error("ENS parent registry is not an address.");
   }
   const account = privateKeyToAccount(input.privateKey);
@@ -159,7 +192,15 @@ export async function registerUnderParent(input: {
   if (!isAddress(owner)) {
     throw new Error("Owner is not an address.");
   }
+  const address = input.address ?? account.address;
+  if (!isAddress(address)) {
+    throw new Error("ETH address record is not an address.");
+  }
   const parentLabel = parentLabelOf(input.parentName);
+  const parentRegistry = await registryHolding(rpcUrl, root, input.parentName);
+  if (parentRegistry === zeroAddress) {
+    throw new Error(`Register the parent of ${input.parentName} first.`);
+  }
   let subregistry = await subregistryOf(rpcUrl, parentRegistry, parentLabel);
   if (subregistry === zeroAddress) {
     subregistry = await deployUserRegistry({
@@ -217,13 +258,13 @@ export async function registerUnderParent(input: {
   if (!named.name) {
     throw new Error("ENS name did not resolve after registration.");
   }
-  if (named.address?.toLowerCase() !== account.address.toLowerCase()) {
+  if (named.address?.toLowerCase() !== address.toLowerCase()) {
     await writeEthAddress({
       rpcUrl,
       account,
       resolver,
       name: named.name,
-      address: account.address,
+      address,
     });
   }
   if (input.records && input.records.length > 0) {
@@ -253,7 +294,11 @@ export async function readUnderParent(
   const parentLabel = parentLabelOf(parentName);
   let subregistry: Address;
   try {
-    subregistry = await subregistryOf(rpcUrl, parentRegistry, parentLabel);
+    const holding = await registryHolding(rpcUrl, parentRegistry, parentName);
+    subregistry =
+      holding === zeroAddress
+        ? zeroAddress
+        : await subregistryOf(rpcUrl, holding, parentLabel);
   } catch (error) {
     const message = error instanceof Error ? error.message : "ENS read failed.";
     return {

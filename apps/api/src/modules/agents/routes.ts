@@ -3,7 +3,13 @@ import { readAgentAccess } from "../../agent-key";
 import { respond } from "../../result";
 import { session } from "../../session";
 import { toPolicyDto } from "./dto";
-import { readAgentEns, recordsToPublish, registerAgentEns } from "./ens";
+import {
+  type AgentName,
+  agentEnsName,
+  readAgentEns,
+  recordsToPublish,
+  registerAgentEns,
+} from "./ens";
 import { agentIdParams, createAgentBody, setPolicyBody } from "./schemas";
 import {
   createAgent,
@@ -14,8 +20,12 @@ import {
   setPolicy,
 } from "./service";
 
-async function agentWithEns<T extends { name: string }>(agent: T) {
-  return { ...agent, ens: await readAgentEns(agent.name) };
+async function agentWithEns<T extends AgentName>(agent: T) {
+  return {
+    ...agent,
+    ensName: agentEnsName(agent),
+    ens: await readAgentEns(agent),
+  };
 }
 
 // Owner routes. Each one sees only the signed-in owner's agents.
@@ -24,14 +34,15 @@ export const agentsRoutes = new Elysia({ prefix: "/agents" })
   .post(
     "/",
     async ({ body, owner, set }) => {
-      const created = await createAgent(body.name, owner.userId);
+      const created = await createAgent(body, owner.userId);
       if (!created.ok) {
         return respond(set, created);
       }
-      const policy = await setPolicy(created.value.agent.id, owner.userId, {
-        autonomousLimit: "500",
-        hardLimit: "5000",
-      });
+      const policy = await setPolicy(
+        created.value.agent.id,
+        owner.userId,
+        body.policy ?? { autonomousLimit: "500", hardLimit: "5000" },
+      );
       return {
         ...(await agentWithEns(created.value.agent)),
         key: created.value.key,
@@ -82,9 +93,9 @@ export const agentsRoutes = new Elysia({ prefix: "/agents" })
       try {
         const policy = await getPolicy(agent.id);
         return await registerAgentEns(
-          agent.name,
+          agent,
           body.owner,
-          await recordsToPublish(agent.name, policy),
+          await recordsToPublish(agent, policy),
         );
       } catch (error) {
         set.status = 400;

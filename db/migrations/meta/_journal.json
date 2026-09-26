@@ -50,6 +50,13 @@
       "when": 1790470000000,
       "tag": "0006_agent_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790475000000,
+      "tag": "0007_agent_ids",
+      "breakpoints": true
     }
   ]
 }

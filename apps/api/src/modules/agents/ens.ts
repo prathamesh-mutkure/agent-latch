@@ -1,4 +1,4 @@
-import { formatUsdc, type Policy } from "@agentlatch/core";
+import { type Agent, formatUsdc, type Policy } from "@agentlatch/core";
 import {
   type EnsIdentity,
   publishPolicyOnName,
@@ -11,25 +11,36 @@ import { policyChange, policyFromTexts } from "./published";
 
 export type AgentEns = EnsIdentity;
 
+/** What locates an agent's name: `name.username.<parent>`, or `name.<parent>`. */
+export type AgentName = Pick<Agent, "name" | "username">;
+
 function rpcUrl() {
   return process.env.SEPOLIA_RPC_URL ?? sepoliaEns.defaultRpcUrl;
 }
 
-function parentName() {
+export function parentName() {
   return process.env.ENS_PARENT_NAME ?? sepoliaEns.defaultParentName;
+}
+
+function registry() {
+  return process.env.ENS_REGISTRY_ADDRESS ?? sepoliaEns.ethRegistry;
+}
+
+function namespaceOf(agent: AgentName) {
+  return agent.username ? `${agent.username}.${parentName()}` : parentName();
+}
+
+/** The agent id: the full ENS name, registered or not. */
+export function agentEnsName(agent: AgentName): string {
+  return `${agent.name}.${namespaceOf(agent)}`;
 }
 
 export function loadPolicyTexts(name: string) {
   return readPolicyTexts(name, rpcUrl());
 }
 
-export function readAgentEns(label: string): Promise<AgentEns> {
-  return readUnderParent(
-    label,
-    parentName(),
-    rpcUrl(),
-    process.env.ENS_REGISTRY_ADDRESS ?? sepoliaEns.ethRegistry,
-  );
+export function readAgentEns(agent: AgentName): Promise<AgentEns> {
+  return readUnderParent(agent.name, namespaceOf(agent), rpcUrl(), registry());
 }
 
 export function policyRecords(
@@ -58,13 +69,13 @@ export function policyRecords(
 }
 
 export async function recordsToPublish(
-  label: string,
+  agent: AgentName,
   policy: Policy | undefined,
 ): Promise<{ key: string; value: string }[] | undefined> {
   if (!policy) {
     return undefined;
   }
-  const identity = await readAgentEns(label);
+  const identity = await readAgentEns(agent);
   if (identity.status === "UNAVAILABLE") {
     throw new Error(identity.detail ?? "ENS name could not be read.");
   }
@@ -82,14 +93,14 @@ export async function recordsToPublish(
 }
 
 export async function publishPolicyRecords(
-  label: string,
+  agent: AgentName,
   records: { key: string; value: string }[],
 ): Promise<void> {
   const privateKey = process.env.EXECUTOR_PRIVATE_KEY;
   if (!privateKey?.startsWith("0x")) {
     throw new Error("EXECUTOR_PRIVATE_KEY is required to publish a policy.");
   }
-  const identity = await readAgentEns(label);
+  const identity = await readAgentEns(agent);
   if (!identity.name) {
     throw new Error("ENS name is not registered.");
   }
@@ -103,24 +114,55 @@ export async function publishPolicyRecords(
   });
 }
 
-export function registerAgentEns(
-  label: string,
-  owner?: string,
-  records?: { key: string; value: string }[],
-): Promise<AgentEns> {
+function executorKey(): `0x${string}` {
   const privateKey = process.env.EXECUTOR_PRIVATE_KEY;
   if (!privateKey?.startsWith("0x")) {
     throw new Error(
       "EXECUTOR_PRIVATE_KEY is required to register an ENS name.",
     );
   }
+  return privateKey as `0x${string}`;
+}
+
+/**
+ * Registers `name.username.<parent>`, first registering the owner's
+ * `username.<parent>` if it is missing. The ETH record is the agent's signing
+ * address when it has one.
+ */
+export async function registerAgentEns(
+  agent: AgentName & { authAddress: string | null },
+  owner?: string,
+  records?: { key: string; value: string }[],
+): Promise<AgentEns> {
+  const privateKey = executorKey();
+  if (agent.username) {
+    const space = await readUnderParent(
+      agent.username,
+      parentName(),
+      rpcUrl(),
+      registry(),
+    );
+    if (space.status === "UNAVAILABLE") {
+      throw new Error(space.detail ?? "ENS name could not be read.");
+    }
+    if (space.status !== "REGISTERED") {
+      await registerUnderParent({
+        parentName: parentName(),
+        label: agent.username,
+        privateKey,
+        rpcUrl: rpcUrl(),
+        parentRegistry: registry(),
+      });
+    }
+  }
   return registerUnderParent({
-    parentName: parentName(),
-    label,
+    parentName: namespaceOf(agent),
+    label: agent.name,
     owner,
-    privateKey: privateKey as `0x${string}`,
+    address: agent.authAddress ?? undefined,
+    privateKey,
     rpcUrl: rpcUrl(),
-    parentRegistry: process.env.ENS_REGISTRY_ADDRESS ?? sepoliaEns.ethRegistry,
+    parentRegistry: registry(),
     records,
   });
 }
