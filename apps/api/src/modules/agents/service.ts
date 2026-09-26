@@ -13,6 +13,13 @@ import { db } from "../../db/client";
 import type { Failure, Success } from "../../result";
 import { recordAudit } from "../audit/service";
 import { toAgent, toPolicy } from "./dto";
+import {
+  loadPolicyTexts,
+  policyRecords,
+  publishPolicyRecords,
+  readAgentEns,
+} from "./ens";
+import { policyChange, policyFromTexts } from "./published";
 import { agents, policies } from "./schema";
 
 export async function createAgent(
@@ -114,7 +121,8 @@ export async function setPolicy(
     allowedTargets?: string[];
   },
 ): Promise<Success<Policy> | Failure> {
-  if (!(await getAgent(agentId))) {
+  const agent = await getAgent(agentId);
+  if (!agent) {
     return { ok: false, status: 404, error: "Agent not found." };
   }
 
@@ -171,6 +179,44 @@ export async function setPolicy(
     allowedTargets: (input.allowedTargets ?? []).map((target) => target.trim()),
     updatedAt: updatedAt.toISOString(),
   };
+
+  const identity = await readAgentEns(agent.name);
+  if (identity.status === "UNAVAILABLE") {
+    return {
+      ok: false,
+      status: 503,
+      error: identity.detail ?? "ENS name could not be read.",
+    };
+  }
+  if (identity.status === "REGISTERED" && identity.name) {
+    const published = policyFromTexts(
+      agentId,
+      await loadPolicyTexts(identity.name),
+    );
+    const change = published ? policyChange(published, policy) : "tighter";
+    if (change === "looser") {
+      return {
+        ok: false,
+        status: 400,
+        error:
+          "Raising a limit or adding a permission is not published to the name yet.",
+      };
+    }
+    if (change === "tighter") {
+      try {
+        await publishPolicyRecords(agent.name, policyRecords(policy));
+      } catch (error) {
+        return {
+          ok: false,
+          status: 503,
+          error:
+            error instanceof Error
+              ? error.message
+              : "ENS policy publish failed.",
+        };
+      }
+    }
+  }
 
   await db.transaction(async (tx) => {
     await tx

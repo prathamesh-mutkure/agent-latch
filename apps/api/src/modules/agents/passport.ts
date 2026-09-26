@@ -2,11 +2,11 @@ import type { Failure } from "../../result";
 import { readAgentEns } from "./ens";
 
 export type PassportGate =
-  | { state: "active" }
+  | { state: "active"; name: string }
   | { state: "unread"; error: string }
   | { state: "inactive"; reason: string };
 
-/** Identity check only. Policy stays in Postgres and does not import ENS. */
+/** Identity check only. The spending decision reads the name's text records. */
 export async function readPassportGate(
   label: string,
   now: Date,
@@ -24,7 +24,7 @@ export async function readPassportGate(
   if (identity.status !== "REGISTERED" || !identity.name) {
     return { state: "inactive", reason: "ENS name is not registered." };
   }
-  return { state: "active" };
+  return { state: "active", name: identity.name };
 }
 
 export function passportFailure(gate: PassportGate): Failure | null {

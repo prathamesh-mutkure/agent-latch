@@ -29,6 +29,7 @@ import {
   ensureOwnedResolver,
   pointResolver,
   writeEthAddress,
+  writePolicyRecords,
 } from "./resolver";
 
 function parentLabelOf(parentName: string): string {
@@ -146,6 +147,7 @@ export async function registerUnderParent(input: {
   owner?: string;
   rpcUrl?: string;
   parentRegistry?: string;
+  records?: { key: string; value: string }[];
 }): Promise<EnsIdentity> {
   const rpcUrl = input.rpcUrl ?? sepoliaEns.defaultRpcUrl;
   const parentRegistry = input.parentRegistry ?? sepoliaEns.ethRegistry;
@@ -222,6 +224,15 @@ export async function registerUnderParent(input: {
       resolver,
       name: named.name,
       address: account.address,
+    });
+  }
+  if (input.records && input.records.length > 0) {
+    await writePolicyRecords({
+      rpcUrl,
+      account,
+      resolver,
+      name: named.name,
+      records: input.records,
     });
   }
   return resolveEnsIdentity(label, {

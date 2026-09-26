@@ -20,8 +20,8 @@ Rewrite the row you changed. Do not append a diary. Commands live in `commands.m
 | 7 | Dashboard | done | passed | `apps/web`. Eden client in `packages/api-client` |
 | 5 | World ID for Agents | in progress | partial | `@agentlatch/world`, `modules/auth`, owner claim, `/approve/:id`. Approve and deny only via World step-up. Live sandbox round trip not run yet |
 | 6 | Intercepta + x402 | done | passed | Quick scan and a signed Sepolia USDC settlement |
-| later | ENS gate and resolver | done | passed | Missing or expired name blocks the action. `trader.agent-latch.eth` resolver `0xe71b020df50c07DAcE858f47BaC4341f82c82001`, ETH address `0x142B99367b928608835501633534411EFc467737`. Policy stays in Postgres |
-| last | Policy on ENS | todo | not started | Publish rules onto ENS. A looser edit needs a fresh approval. Tighter edits write immediately |
+| later | ENS gate and resolver | done | passed | Missing or expired name blocks the action. `trader.agent-latch.eth` resolver `0xe71b020df50c07DAcE858f47BaC4341f82c82001`, ETH address `0x142B99367b928608835501633534411EFc467737`. Text records: autonomous 500, hard 5000, daily none. Engine still reads Postgres |
+| last | Publish a looser ENS policy | todo | not started | Tighter edits write the name now. Raising a limit or adding a permission waits on the World check. A policy content hash is post-hackathon |
 | 8 | World mini app | todo | not started | After phase 5 |
 | 9 | Uniswap | todo | not started | Optional, last |
 | 10 | Hackathon polish | todo | not started | |
@@ -53,7 +53,7 @@ No unit test suite. Checks are `bun run typecheck` and `bun run lint`.
 - Demo policy: autonomous 500, hard limit 5000. No daily cap on the background agent.
 - `ens.name` is set when ENSjs returns an owner or the registry status is `REGISTERED`.
 - Sepolia demo signer: `0x142B99367b928608835501633534411EFc467737`. Parent name: `agent-latch.eth`.
-- `POST /agents/:id/ens` deploys a UserRegistry under `ENS_PARENT_NAME` when needed, then registers the agent label, points it at the signer's Permissioned Resolver, and writes the signer's ETH address. A name that is already registered is updated. The signer must be the parent owner and hold Sepolia ETH. An action is blocked when that name is missing or expired.
+- `POST /agents/:id/ens` deploys a UserRegistry under `ENS_PARENT_NAME` when needed, then registers the agent label, points it at the signer's Permissioned Resolver, writes the signer's ETH address, and copies the current Postgres policy onto the name when that copy is not looser than the published one. The signer must be the parent owner and hold Sepolia ETH. An action is blocked when that name is missing, expired, or has no published policy. The spending decision reads the name.
 - Swaps stay unsigned. An x402 settlement signs and broadcasts. Policy stays free of sponsors.
 - The dashboard polls the API through the Vite proxy (`/api`, prefix stripped; `/auth` as is). Approve is a redirect to `/auth/world/step-up?approval=:id`. Deny is the same redirect with `&decision=deny`. Approvals expire after 5 minutes.
 - The payments page lists `X402_PAYMENT` actions. Each one is quick-scanned before execution. A clear scan settles Circle USDC with EIP-3009. The signer pays Sepolia gas. A missing key, a 404 from the scan, or a failed settlement refuses the payment. Live traits may omit `txsCount`.

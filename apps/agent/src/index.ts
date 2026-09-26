@@ -32,7 +32,11 @@ async function waitForApi(): Promise<void> {
 async function ensureAgent(): Promise<string> {
   const agents = await listAgents();
   const existing = agents.find((agent) => agent.name === agentName);
-  const agent = existing ?? (await createAgent(agentName));
+  if (existing) {
+    console.log(`agent ${existing.name} ${existing.id}`);
+    return existing.id;
+  }
+  const agent = await createAgent(agentName);
   await setDemoPolicy(agent.id);
   console.log(`agent ${agent.name} ${agent.id} policy 500/5000 USDC`);
   return agent.id;

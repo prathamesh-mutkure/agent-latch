@@ -120,7 +120,7 @@ Supersedes the `POST /agents/:id/ens` sentence in "ENSv2".
 
 Supersedes the parts of `planning-v2.md` that use Base, a Hono seller service, drop Intercepta, rename the product, or store policy in ENS now. The handoff is `continuation.md`.
 
-- Policy stays in Postgres. `evaluatePolicy` reads the `policies` table. ENS stays identity. Copying rules onto ENS text records is last, after the Postgres policy path is finished.
+- Policy stays in Postgres. `evaluatePolicy` reads the `policies` table. ENS stays identity. Copying rules onto ENS text records is last, after the Postgres policy path is finished. Superseded the same day by "Published policy is read from ENS" below.
 - Payments stay on Ethereum Sepolia. Do not add Base.
 - Intercepta stays. The action service screens `X402_PAYMENT` after policy and before signing.
 - Stack stays this repo: Elysia, Drizzle, and the current packages. `GET /x402/resource` is the paid resource. Do not add a Hono seller app. Do not rename the product. Do not replace `ActionRequest` with `POST /api/v1/fetch`.
@@ -130,7 +130,17 @@ Supersedes the parts of `planning-v2.md` that use Base, a Hono seller service, d
 
 - `POST /agents/:id/ens` deploys one Permissioned Resolver for the signer when needed, points the name at it, and writes the signer's ETH address with `setAddress`. A name that is already registered is updated instead of registered again.
 - `submitAction` records `BLOCK` when the name is not `REGISTERED` or is expired. An ENS read failure returns 503 and does not execute. Approve uses the same check before execution.
-- Policy still comes from Postgres. Policy text records are not written.
+- `POST /agents/:id/ens` copies the current Postgres policy onto the name as text records: autonomous limit, hard limit, daily limit, actions, tokens, and targets. Superseded the same day by "Published policy is read from ENS" below for where the decision is read. Raising a limit on the name stays later.
+
+## 2026-09-26 — Published policy is read from ENS
+
+Supersedes the Postgres-only policy sentences in "Continuation from planning-v2" and "ENS name gates actions".
+
+- `evaluatePolicy` stays a pure function. The action service loads its input from the name's text records. A missing record blocks the action. A failed read returns 503. There is no fallback to Postgres.
+- Postgres still stores the policy the owner last saved. Registration copies it onto the name.
+- A tighter edit writes the name first, then Postgres. A tighter edit lowers a limit, adds a daily cap, removes an action, or narrows targets.
+- A looser edit is rejected. Raising a limit, removing the daily cap, or adding an action or target is not published until a later World check.
+- Post-hackathon, replace the plaintext text records with an ENS content hash of the policy so the limits are not public. The decision still checks that hash against the saved policy. Do not build that for the demo.
 
 ## 2026-09-26 — World ID for Agents
 

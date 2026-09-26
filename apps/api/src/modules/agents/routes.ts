@@ -2,7 +2,7 @@ import { Elysia, t } from "elysia";
 import { respond } from "../../result";
 import { session } from "../auth/session";
 import { toPolicyDto } from "./dto";
-import { readAgentEns, registerAgentEns } from "./ens";
+import { readAgentEns, recordsToPublish, registerAgentEns } from "./ens";
 import { agentIdParams, createAgentBody, setPolicyBody } from "./schemas";
 import {
   claimAgent,
@@ -65,7 +65,12 @@ export const agentsRoutes = new Elysia({ prefix: "/agents" })
         return { error: "Agent not found." };
       }
       try {
-        return await registerAgentEns(agent.name, body.owner);
+        const policy = await getPolicy(agent.id);
+        return await registerAgentEns(
+          agent.name,
+          body.owner,
+          await recordsToPublish(agent.name, policy),
+        );
       } catch (error) {
         set.status = 400;
         return {

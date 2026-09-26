@@ -13,4 +13,9 @@ export {
   resolveEnsIdentity,
 } from "./identity";
 export { readUnderParent, registerUnderParent } from "./namespace";
-export { resolveNameWithSdk } from "./sdk";
+export {
+  publishPolicyOnName,
+  resolverOf,
+  writePolicyRecords,
+} from "./resolver";
+export { policyTextKeys, readPolicyTexts, resolveNameWithSdk } from "./sdk";

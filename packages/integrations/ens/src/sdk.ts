@@ -32,3 +32,32 @@ export async function resolveNameWithSdk(
     addressCandidate && isAddress(addressCandidate) ? addressCandidate : null;
   return { owner, address };
 }
+
+export const policyTextKeys = [
+  "policy.autonomousLimit",
+  "policy.hardLimit",
+  "policy.dailyLimit",
+  "policy.actions",
+  "policy.tokens",
+  "policy.targets",
+] as const;
+
+export async function readPolicyTexts(
+  name: string,
+  rpcUrl: string = sepoliaEns.defaultRpcUrl,
+): Promise<Record<(typeof policyTextKeys)[number], string | null>> {
+  const client = createEnsPublicClient({
+    chain: sepolia,
+    transport: http(rpcUrl),
+  });
+  const entries = await Promise.all(
+    policyTextKeys.map(async (key) => {
+      const value = await client.getTextRecord({ name, key });
+      return [key, value && value.length > 0 ? value : null] as const;
+    }),
+  );
+  return Object.fromEntries(entries) as Record<
+    (typeof policyTextKeys)[number],
+    string | null
+  >;
+}

@@ -17,8 +17,10 @@ import { db } from "../../db/client";
 import { saveExecution } from "../../executor";
 import { settleAuthorizedPayment } from "../../payments";
 import type { Failure, Success } from "../../result";
+import { loadPolicyTexts } from "../agents/ens";
 import { readPassportGate } from "../agents/passport";
-import { getAgent, getPolicy } from "../agents/service";
+import { policyFromTexts } from "../agents/published";
+import { getAgent } from "../agents/service";
 import { openApproval } from "../approvals/service";
 import { recordAudit } from "../audit/service";
 import { toAction } from "./dto";
@@ -80,17 +82,43 @@ export async function submitAction(input: {
   if (passport.state === "unread") {
     return { ok: false, status: 503, error: passport.error };
   }
-  let decision =
-    passport.state === "inactive"
-      ? { decision: "BLOCK" as const, reasons: [passport.reason] }
-      : evaluatePolicy({
-          policy: await getPolicy(input.agentId),
+  let decision: {
+    decision: "ALLOW" | "BLOCK" | "HUMAN_APPROVAL";
+    reasons: string[];
+  };
+  if (passport.state === "inactive") {
+    decision = { decision: "BLOCK", reasons: [passport.reason] };
+  } else {
+    let published: ReturnType<typeof policyFromTexts>;
+    try {
+      published = policyFromTexts(
+        input.agentId,
+        await loadPolicyTexts(passport.name),
+      );
+    } catch (error) {
+      return {
+        ok: false,
+        status: 503,
+        error:
+          error instanceof Error
+            ? error.message
+            : "ENS policy could not be read.",
+      };
+    }
+    decision = published
+      ? evaluatePolicy({
+          policy: published,
           action: input.action,
           target,
           token,
           amount,
           spentToday: await spentToday(input.agentId, now),
-        });
+        })
+      : {
+          decision: "BLOCK",
+          reasons: ["ENS policy is not published."],
+        };
+  }
 
   if (input.action === "X402_PAYMENT" && decision.decision !== "BLOCK") {
     const screened = await screenPayee(target);

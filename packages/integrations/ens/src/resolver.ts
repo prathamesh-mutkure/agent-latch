@@ -13,7 +13,7 @@ import {
   toBytes,
   toHex,
 } from "viem";
-import type { privateKeyToAccount } from "viem/accounts";
+import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
 import { packetToBytes } from "viem/ens";
 import {
@@ -41,6 +41,30 @@ const resolverInitAbi = [
       { name: "calls", type: "bytes[]" },
     ],
     outputs: [],
+  },
+] as const;
+
+const setTextAbi = [
+  {
+    type: "function",
+    name: "setText",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "name", type: "bytes" },
+      { name: "key", type: "string" },
+      { name: "value", type: "string" },
+    ],
+    outputs: [],
+  },
+] as const;
+
+const multicallAbi = [
+  {
+    type: "function",
+    name: "multicall",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "calls", type: "bytes[]" }],
+    outputs: [{ name: "", type: "bytes[]" }],
   },
 ] as const;
 
@@ -216,4 +240,59 @@ export async function writeEthAddress(input: {
     args: [toHex(packetToBytes(input.name)), ETH_COIN_TYPE, input.address],
   });
   await client.waitForTransactionReceipt({ hash });
+}
+
+/** Initial public copy of the Postgres policy. Later limit increases stay off this path. */
+export async function writePolicyRecords(input: {
+  rpcUrl: string;
+  account: Account;
+  resolver: Address;
+  name: string;
+  records: { key: string; value: string }[];
+}): Promise<void> {
+  if (input.resolver === zeroAddress) {
+    throw new Error("ENS name has no resolver.");
+  }
+  if (input.records.length === 0) {
+    return;
+  }
+  const dnsName = toHex(packetToBytes(input.name));
+  const calls = input.records.map((record) =>
+    encodeFunctionData({
+      abi: setTextAbi,
+      functionName: "setText",
+      args: [dnsName, record.key, record.value],
+    }),
+  );
+  const client = clientFor(input.rpcUrl);
+  const hash = await walletFor(input.account, input.rpcUrl).writeContract({
+    address: input.resolver,
+    abi: multicallAbi,
+    functionName: "multicall",
+    args: [calls],
+  });
+  await client.waitForTransactionReceipt({ hash });
+}
+
+export async function publishPolicyOnName(input: {
+  privateKey: `0x${string}`;
+  rpcUrl: string;
+  registry: Address;
+  label: string;
+  name: string;
+  records: { key: string; value: string }[];
+}): Promise<void> {
+  const account = privateKeyToAccount(input.privateKey);
+  const resolver = await resolverOf({
+    rpcUrl: input.rpcUrl,
+    registry: input.registry,
+    label: input.label,
+  });
+  await writePolicyRecords({
+    rpcUrl: input.rpcUrl,
+    account,
+    resolver,
+    name: input.name,
+    records: input.records,
+  });
 }
