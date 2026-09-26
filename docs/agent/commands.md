@@ -52,10 +52,15 @@ The dashboard at http://localhost:5173 calls those same routes.
 
 `X402_PAYMENT` screens `target` with the Intercepta quick scan before execution. Set `INTERCEPTA_API_KEY`. A missing key refuses the payment. Swaps do not call Intercepta.
 
+`GET /x402/resource` returns 402 with the Sepolia USDC requirements. Pay that quote with an action. Amount `0.01` is under the autonomous limit, so a clear payee is settled immediately. `EXECUTOR_PRIVATE_KEY` must hold Sepolia ETH for gas and Circle USDC for the transfer.
+
 ```sh
+curl -sS -D - "http://localhost:3001/x402/resource"
+# after a signed settlement
+curl -sS "http://localhost:3001/x402/resource?tx=<txHash>"
 curl -X POST "http://localhost:3001/agents/<agentId>/actions" \
   -H "content-type: application/json" \
-  -d '{"action":"X402_PAYMENT","target":"0x0000000000000000000000000000000000000001","amount":"1"}'
+  -d '{"action":"X402_PAYMENT","target":"<payTo from the 402>","amount":"0.01"}'
 ```
 
 Env, all optional:

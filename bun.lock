@@ -27,6 +27,9 @@
         "@agentlatch/core": "workspace:*",
         "@agentlatch/ens": "workspace:*",
         "@agentlatch/intercepta": "workspace:*",
+        "@agentlatch/signer-local": "workspace:*",
+        "@agentlatch/x402": "workspace:*",
+        "@agentlatch/x402-executor": "workspace:*",
         "@elysiajs/cors": "^1.4.2",
         "drizzle-orm": "^0.45.3",
         "elysia": "^1.4.30",
@@ -73,6 +76,15 @@
         "@types/bun": "^1.4.2",
       },
     },
+    "packages/executors/x402": {
+      "name": "@agentlatch/x402-executor",
+      "version": "0.0.0",
+      "dependencies": {
+        "@agentlatch/core": "workspace:*",
+        "@agentlatch/x402": "workspace:*",
+        "viem": "^2.47.6",
+      },
+    },
     "packages/integrations/ens": {
       "name": "@agentlatch/ens",
       "version": "0.0.0",
@@ -86,6 +98,21 @@
       "version": "0.0.0",
       "devDependencies": {
         "@types/bun": "^1.4.2",
+      },
+    },
+    "packages/integrations/x402": {
+      "name": "@agentlatch/x402",
+      "version": "0.0.0",
+      "dependencies": {
+        "@agentlatch/core": "workspace:*",
+      },
+    },
+    "packages/signers/local": {
+      "name": "@agentlatch/signer-local",
+      "version": "0.0.0",
+      "dependencies": {
+        "@agentlatch/core": "workspace:*",
+        "viem": "^2.47.6",
       },
     },
   },
@@ -104,7 +131,13 @@
 
     "@agentlatch/intercepta": ["@agentlatch/intercepta@workspace:packages/integrations/intercepta"],
 
+    "@agentlatch/signer-local": ["@agentlatch/signer-local@workspace:packages/signers/local"],
+
     "@agentlatch/web": ["@agentlatch/web@workspace:apps/web"],
+
+    "@agentlatch/x402": ["@agentlatch/x402@workspace:packages/integrations/x402"],
+
+    "@agentlatch/x402-executor": ["@agentlatch/x402-executor@workspace:packages/executors/x402"],
 
     "@biomejs/biome": ["@biomejs/biome@2.5.14", "", { "optionalDependencies": { "@biomejs/cli-darwin-arm64": "2.5.14", "@biomejs/cli-darwin-x64": "2.5.14", "@biomejs/cli-linux-arm64": "2.5.14", "@biomejs/cli-linux-arm64-musl": "2.5.14", "@biomejs/cli-linux-x64": "2.5.14", "@biomejs/cli-linux-x64-musl": "2.5.14", "@biomejs/cli-win32-arm64": "2.5.14", "@biomejs/cli-win32-x64": "2.5.14" }, "bin": { "biome": "bin/biome" } }, "sha512-0FabLIjd4M/dm8VFI86RMaLLdgepzbdfiAL2R8cr7V81OYYrP1w7Z73KfAwPK5h9SrEBXTzNG2y+mBwPo9xRnw=="],
 

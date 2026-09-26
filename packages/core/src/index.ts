@@ -2,6 +2,12 @@ export const packageId = "@agentlatch/core";
 
 export { authorizationMatches, isExpired } from "./authorization";
 export { evaluatePolicy, type PolicyDecision } from "./policy";
+export type {
+  Address,
+  AgentSigner,
+  Hex,
+  TransferAuthorization,
+} from "./signer";
 export {
   type ActionRequest,
   type ActionStatus,

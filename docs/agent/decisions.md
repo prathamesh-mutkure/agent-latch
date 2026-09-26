@@ -109,6 +109,13 @@ Supersedes the `POST /agents/:id/ens` sentence in "ENSv2".
 - Policy does not import Intercepta. The action service screens `X402_PAYMENT` after policy and before execution. A missing `INTERCEPTA_API_KEY` refuses the payment.
 - x402 signing is still later. A clear screen uses the existing simulated execution.
 
+## 2026-09-26 — x402 settles on Ethereum Sepolia
+
+- Network stays `eip155:11155111`. Asset stays Circle USDC `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238`, EIP-712 name `USDC`, version `2`.
+- The public x402.org facilitator and PayAI do not list that network. CDP does not either. Paratro lists it, but `/x402/settle` only broadcasts authorizations it signed itself. Do not move the demo to Base to follow those lists.
+- Settlement is on-chain. The signer first signs an EIP-712 `transferWithAuthorization` message. That signature does not move USDC. The same signer then sends the Sepolia transaction that submits the signature to the USDC contract, and pays the gas. A facilitator would normally send that transaction. "Outside signature" means the authorization was signed by our demo key, not by a facilitator's wallet. Policy and Intercepta still run before the broadcast.
+- `AgentSigner` lives in `@agentlatch/core`. `LocalKeySigner` reads `EXECUTOR_PRIVATE_KEY`. The executor receives the signer and does not read the key.
+
 ## How to change a decision
 
 Add a new dated section that names what it supersedes. Leave the old section in place and mark it superseded.

@@ -7,7 +7,6 @@ Rewrite the row you changed. Do not append a diary. Commands live in `commands.m
 ## In progress
 
 - World ID, phase 5, in `packages/integrations/world`. Ankit. He owns the approval check. Leave that package alone.
-- Intercepta quick scan is verified. x402 signing, phase 6, is still later. `packages/integrations/x402` and `packages/executors/x402`.
 
 ## Todos
 
@@ -20,12 +19,12 @@ Rewrite the row you changed. Do not append a diary. Commands live in `commands.m
 | 4 | ENSv2 | done | passed | `trader.agent-latch.eth` registered |
 | 7 | Dashboard | done | passed | `apps/web`. Eden client in `packages/api-client` |
 | 5 | World ID for Agents | in progress | not started | Ankit. `packages/integrations/world` and the approval check |
-| 6 | Intercepta + x402 | in progress | intercepta passed | Quick scan verified. x402 signing is not built |
+| 6 | Intercepta + x402 | done | passed | Quick scan and a signed Sepolia USDC settlement |
 | 8 | World mini app | todo | not started | After phase 5 |
 | 9 | Uniswap | todo | not started | Optional, last |
 | 10 | Hackathon polish | todo | not started | |
 
-Empty on purpose: `db/seed`, `packages/executors/api`, `packages/integrations/world`, `packages/integrations/x402`, `packages/executors/x402`, `apps/world-miniapp`, `packages/executors/uniswap`, `packages/signers/local`, `packages/signers/alchemy`, `packages/sdk`, `packages/contracts`, `contracts/`.
+Empty on purpose: `db/seed`, `packages/executors/api`, `packages/integrations/world`, `apps/world-miniapp`, `packages/executors/uniswap`, `packages/signers/alchemy`, `packages/sdk`, `packages/contracts`, `contracts/`.
 
 ## Testing
 
@@ -41,6 +40,7 @@ No unit test suite. Checks are `bun run typecheck` and `bun run lint`.
 | `POST /agents/:id/ens` creates `trader.agent-latch.eth` | done | `REGISTERED`, owner `0x142B99367b928608835501633534411EFc467737`, registry `0xE48a112cCd94F06D316c32E911D752478d4E1236`. ETH address record is null because no resolver was set |
 | Dashboard pages and reject | done | Overview, agent, policies, activity, approvals, and payments render against the live API. Reject on the pending 2500 USDC swap returned `REJECTED` and the audit line showed up. Approve uses the same control. A later 2500 approval was left pending |
 | Intercepta quick scan on `X402_PAYMENT` | done | $1 to `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045` allowed, toxic score 0, simulated execution. $1 to `0x098B716B8Aaf21512996dC57EB0615e2383E2f96` blocked, toxic score 100, no execution. A payee the API does not know returns 404 and the payment is refused |
+| x402 USDC settlement on Sepolia | done | `GET /x402/resource` is 402. `0.01` USDC to `0x142B99367b928608835501633534411EFc467737` allowed, Intercepta score 0, signed execution, tx `0x22d690597c411be1aebb8c98e508852ae407dfb7df5d8c4bec2772315d956f22`. The same URL with `?tx=` returns 200 |
 
 ## Notes
 
@@ -51,4 +51,4 @@ No unit test suite. Checks are `bun run typecheck` and `bun run lint`.
 - `POST /agents/:id/ens` deploys a UserRegistry under `ENS_PARENT_NAME` when needed, then registers the agent label. The signer must be the parent owner and hold Sepolia ETH.
 - Simulated execution never signs. Policy stays free of sponsors.
 - The dashboard polls the API. The API allows the dashboard origin. Approve and reject response bodies are unchanged.
-- The payments page lists `X402_PAYMENT` actions. Each one is quick-scanned before execution. A missing `INTERCEPTA_API_KEY`, or a 404 from the scan, refuses the payment. x402 signing is not built. Live traits may omit `txsCount`.
+- The payments page lists `X402_PAYMENT` actions. Each one is quick-scanned before execution. A clear scan settles Circle USDC with EIP-3009. The signer pays Sepolia gas. A missing key, a 404 from the scan, or a failed settlement refuses the payment. Live traits may omit `txsCount`.

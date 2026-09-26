@@ -7,6 +7,7 @@ import { agentsRoutes } from "./modules/agents/routes";
 import { approvalRoutes } from "./modules/approvals/routes";
 import { auditRoutes } from "./modules/audit/routes";
 import { healthRoutes } from "./modules/health/routes";
+import { x402Routes } from "./modules/x402/routes";
 
 export const app = new Elysia()
   .use(cors())
@@ -14,7 +15,8 @@ export const app = new Elysia()
   .use(agentsRoutes)
   .use(actionRoutes)
   .use(approvalRoutes)
-  .use(auditRoutes);
+  .use(auditRoutes)
+  .use(x402Routes);
 
 export type App = typeof app;
 

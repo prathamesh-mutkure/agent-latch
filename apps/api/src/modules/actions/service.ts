@@ -15,6 +15,7 @@ import {
 import { and, asc, eq, gte } from "drizzle-orm";
 import { db } from "../../db/client";
 import { saveExecution } from "../../executor";
+import { settleAuthorizedPayment } from "../../payments";
 import type { Failure, Success } from "../../result";
 import { getAgent, getPolicy } from "../agents/service";
 import { openApproval } from "../approvals/service";
@@ -95,6 +96,23 @@ export async function submitAction(input: {
         };
   }
 
+  let signed = false;
+  if (input.action === "X402_PAYMENT" && decision.decision === "ALLOW") {
+    const settled = await settleAuthorizedPayment({
+      target,
+      token,
+      amount: amount.toString(),
+    });
+    if (!settled.ok) {
+      return settled;
+    }
+    signed = true;
+    decision = {
+      decision: "ALLOW",
+      reasons: [...decision.reasons, `x402 settled ${settled.value.txHash}`],
+    };
+  }
+
   const id = crypto.randomUUID();
   const action: ActionRequest = {
     id,
@@ -132,7 +150,7 @@ export async function submitAction(input: {
     });
 
     if (decision.decision === "ALLOW") {
-      const execution = await saveExecution(tx, action.id, now);
+      const execution = await saveExecution(tx, action.id, now, signed);
       action.status = "EXECUTED";
       action.executionId = execution.id;
       await tx

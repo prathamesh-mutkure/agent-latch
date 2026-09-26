@@ -9,18 +9,19 @@ export async function saveExecution(
   tx: Db,
   actionRequestId: string,
   now: Date,
+  signed = false,
 ): Promise<SimulatedExecution> {
   const execution: SimulatedExecution = {
     id: crypto.randomUUID(),
     actionRequestId,
     executedAt: now.toISOString(),
-    signed: false,
+    signed,
   };
   await tx.insert(executions).values({
     id: execution.id,
     actionRequestId,
     executedAt: now,
-    signed: false,
+    signed,
   });
   return execution;
 }
@@ -41,6 +42,6 @@ export async function getExecution(
     id: row.id,
     actionRequestId: row.actionRequestId,
     executedAt: row.executedAt.toISOString(),
-    signed: false,
+    signed: row.signed,
   };
 }

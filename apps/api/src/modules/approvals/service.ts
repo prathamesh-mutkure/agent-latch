@@ -7,6 +7,7 @@ import { asc, eq } from "drizzle-orm";
 import type { Db } from "../../db/client";
 import { db } from "../../db/client";
 import { saveExecution } from "../../executor";
+import { settleAuthorizedPayment } from "../../payments";
 import type { Failure, Success } from "../../result";
 import { toAction } from "../actions/dto";
 import { actions } from "../actions/schema";
@@ -136,6 +137,21 @@ export async function resolveApproval(
       };
     }
 
+    if (outcome === "approve" && action.action === "X402_PAYMENT") {
+      const settled = await settleAuthorizedPayment({
+        target: action.target,
+        token: action.token,
+        amount: action.amount,
+      });
+      if (!settled.ok) {
+        return settled;
+      }
+      action.reasons = [
+        ...action.reasons,
+        `x402 settled ${settled.value.txHash}`,
+      ];
+    }
+
     if (outcome === "reject") {
       approval.status = "REJECTED";
       action.status = "REJECTED";
@@ -159,7 +175,12 @@ export async function resolveApproval(
       return { ok: true, value: { approval, action } };
     }
 
-    const execution = await saveExecution(tx, action.id, now);
+    const execution = await saveExecution(
+      tx,
+      action.id,
+      now,
+      action.action === "X402_PAYMENT",
+    );
     approval.status = "APPROVED";
     action.status = "EXECUTED";
     action.executionId = execution.id;
@@ -169,7 +190,11 @@ export async function resolveApproval(
       .where(eq(approvals.id, approval.id));
     await tx
       .update(actions)
-      .set({ status: "EXECUTED", executionId: execution.id })
+      .set({
+        status: "EXECUTED",
+        executionId: execution.id,
+        reasons: action.reasons,
+      })
       .where(eq(actions.id, action.id));
     await recordAudit(tx, {
       agentId: action.agentId,

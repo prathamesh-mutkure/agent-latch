@@ -1,0 +1,17 @@
+{
+  "name": "@agentlatch/x402-executor",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agentlatch/core": "workspace:*",
+    "@agentlatch/x402": "workspace:*",
+    "viem": "^2.47.6"
+  }
+}

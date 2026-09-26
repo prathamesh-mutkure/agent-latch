@@ -90,10 +90,10 @@ export type ApprovalRequest = {
   authorization: ScopedAuthorization;
 };
 
-/** Phase 1 does not sign. `signed` stays false on purpose. */
+/** Swaps stay unsigned. An x402 settlement sets `signed` to true. */
 export type SimulatedExecution = {
   id: string;
   actionRequestId: string;
   executedAt: string;
-  signed: false;
+  signed: boolean;
 };
