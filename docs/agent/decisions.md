@@ -144,7 +144,9 @@ Supersedes the Postgres-only policy sentences in "Continuation from planning-v2"
 
 ## 2026-09-26 — World ID for Agents
 
-Supersedes the login bullet in "Hackathon constraints" and closes "World approval shape" in `open-questions.md`. Follows the World sections of `AgentPass — Technical Architecture.md`, with the corrections in `world-handover.md`.
+Superseded by "World App is the only human surface" (2026-09-27).
+
+Supersedes the login bullet in "Hackathon constraints" and closes "World approval shape" in `open-questions.md`. Follows the World sections of `planning-v2.md`. Later dated entries in this file, and `issues.md`, supersede the old handover notes.
 
 - World ID for Agents (OIDC, `https://sandbox.auth.world.org`) is the owner login and the step-up. One confidential client, `client_secret_basic`, all OIDC work on the API with `openid-client` v6. No IDKit, no World code in the browser.
 - `@agentlatch/world` in `packages/integrations/world` holds discovery, the authorize URL, the code exchange, `computeBindingHash`, and the pure `checkApprovalTicket`. It imports no database, Elysia, policy, executor, or signer code.
@@ -161,6 +163,8 @@ Supersedes the login bullet in "Hackathon constraints" and closes "World approva
 
 ## 2026-09-26 — Deny needs World ID too
 
+Superseded by "World App is the only human surface" (2026-09-27).
+
 Supersedes the deny bullet in "World ID for Agents".
 
 - Deny needs the same fresh World ID step-up as approve: `GET /auth/world/step-up?approval=:id&decision=deny`. `POST /approvals/:id/deny` is removed. No route changes an approval without a World ticket.
@@ -171,6 +175,8 @@ Supersedes the deny bullet in "World ID for Agents".
 
 ## 2026-09-26 — World App notifications
 
+Superseded by "World App is the only human surface" (2026-09-27).
+
 The mini app is the phone surface for approvals. It does not replace the World ID step-up, and it does not sign.
 
 - The owner is the World ID `(iss, sub)` from sign-in. The ENS name owner is the API signer, so it is not the human.
@@ -179,6 +185,8 @@ The mini app is the phone surface for approvals. It does not replace the World I
 - A missing `WORLD_APP_ID`, a missing notification key, or no linked wallet skips the push. The approval still opens.
 
 ## 2026-09-27 — World step-up does not auto-approve
+
+Superseded by "World App is the only human surface" (2026-09-27).
 
 Supersedes the step-up redirect in "World ID for Agents" for how the browser reaches World. The ticket checks stay, with one added claim.
 
@@ -189,12 +197,31 @@ Supersedes the step-up redirect in "World ID for Agents" for how the browser rea
 
 ## 2026-09-27 — Step-up uses the signed-in human
 
+Superseded by "World App is the only human surface" (2026-09-27).
+
 Supersedes the server-started ceremony in "World step-up does not auto-approve".
 
 - The sandbox creates a new person for every ceremony the server starts. That ticket is not the owner, so approval failed `WRONG_HUMAN`.
 - The browser that signed in opens the authorize URL. `prompt=login` is not sent, so World can reuse that session. `max_age=0` and the orb `acr` stay.
 - A passing ticket does not run the action. The approval page shows Confirm, and only that click calls `decideWithWorld`.
 - `auth_time` may be up to 30 minutes before the attempt, so the sign-in from this session still counts.
+
+## 2026-09-27 — World App is the only human surface
+
+Supersedes "World ID for Agents", "Deny needs World ID too", "World App notifications", "World step-up does not auto-approve", and "Step-up uses the signed-in human".
+
+- Why: World is here for one job. When an action is past policy, reach the owner out of band and take their approve or deny. The World ID for Agents sandbox mocks a new person for every ceremony, so the owner never matched (`WRONG_HUMAN`), and its page could approve with no human click.
+- One World product: the World App mini app (MiniKit). No OIDC, sessions, cookies, `/auth` routes, `openid-client`, or `COOKIE_SECRET`.
+- The owner is a World App wallet. `users.world_wallet` (lower case, unique, not null) replaces `(world_iss, world_sub)`. `agents.user_id` still names the owner.
+- Link and claim: `GET /world/nonce` issues a one-time nonce, held in memory for 10 minutes. The mini app signs it with `MiniKit.walletAuth`. `POST /world/link` verifies it and upserts the owner. With `agentId`, the SIWE request ID is that agent ID, and the same signature claims the unowned agent. Without it the request ID is `link`. `POST /agents/:id/claim` is removed, and new agents start unowned.
+- Verification is `verifySiweMessage` from `@worldcoin/minikit-js/siwe`: nonce, statement, request ID, expiry, then ECDSA recovery, then Safe EIP-1271 on World Chain (`WORLDCHAIN_RPC_URL`, optional). World App wallets are Safes, so ECDSA alone is wrong.
+- Push only when an action opens an approval. Allow and block do not push. The push is fire and forget, goes to the owner's wallet through `developer.world.org/api/v2/minikit/send-notification`, and opens `/approve/:id` in the mini app. Unverified mini apps get 40 pushes per 4 hours.
+- Decide: `GET /approvals/:id/challenge?decision=approve|deny` returns what World App signs. `nonce = sha256(binding_hash | decision)`, request ID = approval ID, expiry = approval expiry, and the one-line statement names the verb, action, amount, and agent. `POST /approvals/:id/decide` verifies the signature before the row lock and requires the owner's wallet. Under the lock it rechecks pending, an unchanged owner, and stored = recomputed `binding_hash` (else `FAILED: BINDING`). Deny sets `REJECTED`. Approve runs the ENS passport check and the existing settle path. `decided_by` and `decided_at` record the wallet and time. A bad or foreign signature is 400 or 403 and changes nothing.
+- No route changes an approval without the owner's World App signature. Agent-facing reads (`GET /approvals`, `GET /approvals/:id`) stay open.
+- The browser reaches the API only by `fetch` through `/api` with `ngrok-skip-browser-warning`. Nothing navigates to the API, so the ngrok interstitial is out of the flow.
+- The desktop dashboard does not decide. It links into World App with `MiniKit.getMiniAppUrl`. `/mini` and `/approve/:id` act only inside World App.
+- Kept: the `binding_hash` formula, 5-minute approvals, the passport check before execution, and `FAILED` reasons `BINDING`, `PASSPORT_INACTIVE`, and `PAYMENT_FAILED`. Gone: `WRONG_HUMAN`, `STALE_VERIFICATION`, `WEAK_PROOF`, and `CANCELLED` from the World screen.
+- Tradeoff: a decision proves the wallet, not personhood. The event's World prizes need IDKit or World ID for Agents. See "World ID proof on approve" in `open-questions.md`.
 
 ## How to change a decision
 

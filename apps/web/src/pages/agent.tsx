@@ -4,7 +4,6 @@ import {
   useAgents,
   useApprovals,
   useAudit,
-  useMe,
   usePolicy,
 } from "../hooks";
 import {
@@ -28,12 +27,11 @@ import {
   QueryGate,
   Stat,
 } from "../ui";
-import { ClaimButton } from "./agents";
+import { OwnerLine } from "./agents";
 
 export function AgentPage() {
   const { agentId } = useParams({ from: "/agents/$agentId" });
   const agents = useAgents();
-  const me = useMe();
   const actions = useActions(agentId);
   const policy = usePolicy(agentId);
   const audit = useAudit(agentId);
@@ -156,14 +154,8 @@ export function AgentPage() {
                 />
                 <Field label="ENS owner" value={agent.ens.owner ?? "Unknown"} />
                 <Field
-                  label="World ID owner"
-                  value={
-                    !agent.userId
-                      ? "Unclaimed"
-                      : me.data && agent.userId === me.data.id
-                        ? "You"
-                        : "Another World ID"
-                  }
+                  label="Owner"
+                  value={agent.userId ? "World App wallet" : "Unclaimed"}
                 />
                 <Field label="Registry" value={agent.ens.registry} />
                 <Field
@@ -180,18 +172,7 @@ export function AgentPage() {
               {agent.ens.detail ? (
                 <p className="mt-3 text-sm text-muted">{agent.ens.detail}</p>
               ) : null}
-              {!agent.userId ? (
-                me.data ? (
-                  <ClaimButton agentId={agent.id} />
-                ) : (
-                  <a
-                    href="/auth/world/login"
-                    className="mt-4 inline-block text-sm underline"
-                  >
-                    Sign in with World ID to claim
-                  </a>
-                )
-              ) : null}
+              <OwnerLine claimed={Boolean(agent.userId)} />
               <h3 className="mt-5 text-sm font-medium tracking-wide text-muted">
                 Permissions
               </h3>

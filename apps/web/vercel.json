@@ -1,10 +1,6 @@
 {
   "rewrites": [
     {
-      "source": "/auth/(.*)",
-      "destination": "https://unpractical-unnoteworthy-mariah.ngrok-free.dev/auth/$1"
-    },
-    {
       "source": "/api/(.*)",
       "destination": "https://unpractical-unnoteworthy-mariah.ngrok-free.dev/$1"
     },

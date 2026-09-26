@@ -5,6 +5,7 @@ import {
   createRouter,
   Link,
   RouterProvider,
+  redirect,
 } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -19,6 +20,9 @@ import { OverviewPage } from "./pages/overview";
 import { PaymentsPage } from "./pages/payments";
 import { PoliciesPage } from "./pages/policies";
 import { Shell } from "./shell";
+import { insideWorldApp, installWorldApp } from "./world";
+
+installWorldApp();
 
 const rootRoute = createRootRoute({
   component: Shell,
@@ -27,6 +31,11 @@ const rootRoute = createRootRoute({
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
+  beforeLoad: () => {
+    if (insideWorldApp) {
+      throw redirect({ to: "/mini" });
+    }
+  },
   component: OverviewPage,
 });
 
@@ -63,11 +72,8 @@ const approvalsRoute = createRoute({
 const approveRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/approve/$approvalId",
-  validateSearch: (
-    search: Record<string, unknown>,
-  ): { result?: string; handoff?: "1" } => ({
+  validateSearch: (search: Record<string, unknown>): { result?: string } => ({
     result: typeof search.result === "string" ? search.result : undefined,
-    handoff: search.handoff === "1" ? "1" : undefined,
   }),
   component: ApprovePage,
 });

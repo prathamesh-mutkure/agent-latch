@@ -3,13 +3,16 @@ import {
   type ApprovalRequest,
   type ApprovalStatus,
   authorizationMatches,
+  formatUsdc,
 } from "@agentlatch/core";
 import {
   type BindingFields,
-  checkApprovalTicket,
   computeBindingHash,
-  type StepUpDecision,
-  type WorldIdentity,
+  type Decision,
+  type DecisionChallenge,
+  decisionChallenge,
+  verifyWalletAuth,
+  type WalletAuthPayload,
 } from "@agentlatch/world";
 import { and, asc, eq } from "drizzle-orm";
 import type { Db, Tx } from "../../db/client";
@@ -30,23 +33,16 @@ import { approvals } from "./schema";
 /** A fresh approval is short-lived: the owner decides within five minutes. */
 const APPROVAL_TTL_MS = 5 * 60 * 1000;
 
-/** Outcome of a World step-up, shown on the approve page as `?result=`. */
-export type StepUpResult =
+/** Outcome of a signed World App decision, shown on the approve page as `?result=`. */
+export type DecisionResult =
   | "paid"
   | "approved"
   | "denied"
-  | "cancelled"
   | "expired"
-  | "not_pending"
   | "binding"
-  | "wrong_human"
-  | "stale"
   | "payment_failed"
-  | "deny_cancelled"
   | "passport_inactive"
-  | "passport_unread"
-  | "weak"
-  | "pending_confirm";
+  | "passport_unread";
 
 type ApprovalRow = typeof approvals.$inferSelect;
 
@@ -84,7 +80,7 @@ export async function listApprovals(): Promise<ApprovalRequest[]> {
   });
 }
 
-/** Pending approvals for the signed-in owner. The agent still polls the open list. */
+/** Pending approvals for one owner. The agent still polls the open list. */
 export async function listOwnerApprovals(
   userId: string,
 ): Promise<ApprovalRequest[]> {
@@ -138,6 +134,8 @@ export async function openApproval(
     createdAt: now.toISOString(),
     nonce: action.nonce,
     failureReason: null,
+    decidedBy: null,
+    decidedAt: null,
     authorization: {
       agentId: action.agentId,
       action: action.action,
@@ -164,6 +162,86 @@ export async function openApproval(
     bindingHash: computeBindingHash(bindingFields({ ...approval, expiresAt })),
   });
   return approval;
+}
+
+type Pending = {
+  row: ApprovalRow;
+  agentName: string;
+  ownerId: string | null;
+  ownerWallet: string | null;
+};
+
+/** Reads one pending approval with its agent name and owner wallet. No lock. */
+async function readPending(
+  approvalId: string,
+  now: Date,
+): Promise<Success<Pending> | Failure> {
+  const rows = await db.transaction(async (tx) => {
+    await expireDue(tx, now);
+    return tx
+      .select({
+        row: approvals,
+        agentName: agents.name,
+        ownerId: agents.userId,
+        ownerWallet: users.worldWallet,
+      })
+      .from(approvals)
+      .innerJoin(agents, eq(approvals.agentId, agents.id))
+      .leftJoin(users, eq(agents.userId, users.id))
+      .where(eq(approvals.id, approvalId))
+      .limit(1);
+  });
+  const found = rows[0];
+  if (!found) {
+    return { ok: false, status: 404, error: "Approval not found." };
+  }
+  if (found.row.status !== "PENDING") {
+    return {
+      ok: false,
+      status: 409,
+      error: `Approval is ${found.row.status}.`,
+    };
+  }
+  if (!found.row.bindingHash) {
+    return {
+      ok: false,
+      status: 409,
+      error: "Approval has no binding. Ask the agent to retry.",
+    };
+  }
+  if (!found.ownerWallet) {
+    return {
+      ok: false,
+      status: 403,
+      error: "Claim this agent in World App first.",
+    };
+  }
+  return { ok: true, value: found };
+}
+
+function challengeFor(pending: Pending, decision: Decision): DecisionChallenge {
+  const { row } = pending;
+  return decisionChallenge({
+    approvalId: row.id,
+    bindingHash: row.bindingHash ?? "",
+    decision,
+    agentName: pending.agentName,
+    action: row.action,
+    amountUsdc: formatUsdc(row.amount),
+    expiresAt: row.expiresAt.toISOString(),
+  });
+}
+
+/** What World App signs for one decision. Rebuilt from the stored approval each time. */
+export async function getDecisionChallenge(
+  approvalId: string,
+  decision: Decision,
+): Promise<Success<DecisionChallenge> | Failure> {
+  const pending = await readPending(approvalId, new Date());
+  if (!pending.ok) {
+    return pending;
+  }
+  return { ok: true, value: challengeFor(pending.value, decision) };
 }
 
 type Loaded = {
@@ -224,6 +302,7 @@ async function closeApproval(
     kind: AuditKind;
     summary: string;
     failureReason?: string;
+    decidedBy?: string;
     now: Date;
   },
 ) {
@@ -237,6 +316,9 @@ async function closeApproval(
     .set({
       status: outcome.status,
       failureReason: outcome.failureReason ?? null,
+      ...(outcome.decidedBy
+        ? { decidedBy: outcome.decidedBy, decidedAt: outcome.now }
+        : {}),
     })
     .where(eq(approvals.id, approval.id));
   await tx
@@ -258,262 +340,164 @@ async function closeApproval(
   );
 }
 
-function requireOwner(loaded: Loaded, userId: string): Failure | undefined {
-  if (!loaded.ownerId || loaded.ownerId !== userId) {
+function shortWallet(wallet: string): string {
+  return `${wallet.slice(0, 6)}…${wallet.slice(-4)}`;
+}
+
+/**
+ * The owner signed Approve or Deny in World App. The signature must come from
+ * the wallet that claimed the agent and cover this approval, this exact action,
+ * and this decision. Deny closes the approval; approve executes the action.
+ * The agent never triggers execution; only this path does.
+ */
+export async function decideInWorldApp(
+  approvalId: string,
+  decision: Decision,
+  payload: WalletAuthPayload,
+): Promise<Success<DecisionResult> | Failure> {
+  const pending = await readPending(approvalId, new Date());
+  if (!pending.ok) {
+    return pending;
+  }
+  const { row: seen, ownerId, ownerWallet } = pending.value;
+
+  // Verified before the row lock: Safe signatures are checked on World Chain.
+  const check = await verifyWalletAuth(
+    payload,
+    challengeFor(pending.value, decision),
+    process.env.WORLDCHAIN_RPC_URL?.trim() || undefined,
+  );
+  if (!check.ok) {
+    return { ok: false, status: 400, error: check.error };
+  }
+  if (check.wallet !== ownerWallet) {
     return {
       ok: false,
       status: 403,
-      error: "Only this agent's owner can decide its approvals.",
+      error: "This World App wallet does not own the agent.",
     };
   }
-  if (loaded.approval.status !== "PENDING") {
-    return {
-      ok: false,
-      status: 409,
-      error: `Approval is ${loaded.approval.status}.`,
-    };
-  }
-  return undefined;
-}
+  const signer = check.wallet;
 
-/**
- * Owner pressed Approve or Deny. Records when the World step-up started, which
- * the freshness check compares `auth_time` against. Returns the binding hash.
- */
-export async function startStepUp(
-  approvalId: string,
-  userId: string,
-): Promise<Success<{ bindingHash: string }> | Failure> {
   const now = new Date();
-  return db.transaction(async (tx) => {
-    const loaded = await loadForUpdate(tx, approvalId, now);
-    if (!loaded.ok) {
-      return loaded;
-    }
-    const refused = requireOwner(loaded.value, userId);
-    if (refused) {
-      return refused;
-    }
-    const bindingHash = loaded.value.row.bindingHash;
-    if (!bindingHash) {
-      return {
-        ok: false,
-        status: 409,
-        error: "Approval predates World binding. Ask the agent to retry.",
-      };
-    }
-    await tx
-      .update(approvals)
-      .set({ stepUpStartedAt: now })
-      .where(eq(approvals.id, approvalId));
-    return { ok: true, value: { bindingHash } };
-  });
-}
-
-/**
- * Owner backed out on the World screen. Backing out of Approve cancels the
- * approval. Backing out of Deny leaves it pending, so the owner can decide again.
- */
-export async function cancelStepUp(
-  approvalId: string,
-  userId: string | null,
-  decision: StepUpDecision,
-): Promise<StepUpResult> {
-  if (decision === "deny") {
-    return "deny_cancelled";
-  }
-  const now = new Date();
-  return db.transaction(async (tx) => {
-    const loaded = await loadForUpdate(tx, approvalId, now);
-    if (!loaded.ok) {
-      return "not_pending";
-    }
-    if (loaded.value.approval.status === "EXPIRED") {
-      return "expired";
-    }
-    if (!userId || requireOwner(loaded.value, userId)) {
-      return "not_pending";
-    }
-    await closeApproval(tx, loaded.value, {
-      status: "CANCELLED",
-      kind: "CANCELLED",
-      summary: `Cancelled on the World ID screen: ${loaded.value.approval.reason}`,
-      now,
-    });
-    return "cancelled";
-  });
-}
-
-const failureResults = {
-  BINDING: "binding",
-  WRONG_HUMAN: "wrong_human",
-  STALE_VERIFICATION: "stale",
-  WEAK_PROOF: "weak",
-} as const;
-
-/**
- * Runs the server-side checks on a validated World ticket, then applies the
- * owner's decision: deny closes the approval, approve executes the action.
- * The agent never triggers execution; only this path does.
- */
-export async function decideWithWorld(
-  approvalId: string,
-  identity: WorldIdentity,
-  cookieNonce: string,
-  decision: StepUpDecision,
-  /** When false, a passing ticket is stored by the caller and nothing runs yet. */
-  commit = true,
-): Promise<StepUpResult> {
-  const now = new Date();
-  return db.transaction(async (tx) => {
-    const loaded = await loadForUpdate(tx, approvalId, now);
-    if (!loaded.ok) {
-      return "not_pending";
-    }
-    const { row, approval, action, ownerId } = loaded.value;
-    const ownerRows = ownerId
-      ? await tx
-          .select({ iss: users.worldIss, sub: users.worldSub })
-          .from(users)
-          .where(eq(users.id, ownerId))
-          .limit(1)
-      : [];
-
-    const check = checkApprovalTicket({
-      identity,
-      approval: {
-        status: row.status,
-        expiresAt: row.expiresAt,
-        bindingHash: row.bindingHash,
-        stepUpStartedAt: row.stepUpStartedAt,
-        fields: bindingFields(row),
-      },
-      owner: ownerRows[0] ?? null,
-      cookieNonce,
-      decision,
-      now,
-    });
-
-    if (!check.ok) {
-      switch (check.reason) {
-        case "NOT_PENDING":
-          return approval.status === "EXPIRED" ? "expired" : "not_pending";
-        case "EXPIRED":
-          await closeApproval(tx, loaded.value, {
-            status: "EXPIRED",
-            kind: "EXPIRED",
-            summary: `Approval expired before World ID finished: ${approval.reason}`,
-            now,
-          });
-          return "expired";
-        default:
-          await closeApproval(tx, loaded.value, {
-            status: "FAILED",
-            kind: "FAILED",
-            summary: `World ID check failed (${check.reason}): ${approval.reason}`,
-            failureReason: check.reason,
-            now,
-          });
-          return failureResults[check.reason];
+  return db.transaction(
+    async (tx): Promise<Success<DecisionResult> | Failure> => {
+      const loaded = await loadForUpdate(tx, approvalId, now);
+      if (!loaded.ok) {
+        return loaded;
       }
-    }
+      const { row, approval, action } = loaded.value;
+      if (row.status === "EXPIRED") {
+        return { ok: true, value: "expired" };
+      }
+      if (row.status !== "PENDING") {
+        return { ok: false, status: 409, error: `Approval is ${row.status}.` };
+      }
+      if (loaded.value.ownerId !== ownerId) {
+        return {
+          ok: false,
+          status: 409,
+          error: "The agent changed owner. Open the approval again.",
+        };
+      }
 
-    if (!commit) {
-      return "pending_confirm";
-    }
-
-    if (decision === "deny") {
-      await closeApproval(tx, loaded.value, {
-        status: "REJECTED",
-        kind: "REJECTED",
-        summary: `Denied with a fresh World ID proof: ${approval.reason}`,
-        now,
-      });
-      await tx
-        .update(approvals)
-        .set({ worldAuthTime: identity.authTime })
-        .where(eq(approvals.id, approval.id));
-      return "denied";
-    }
-
-    if (!authorizationMatches(approval.authorization, action)) {
-      await closeApproval(tx, loaded.value, {
-        status: "FAILED",
-        kind: "FAILED",
-        summary: `Approval no longer matches the action: ${approval.reason}`,
-        failureReason: "BINDING",
-        now,
-      });
-      return "binding";
-    }
-
-    // The agent's ENS name must still be registered and unexpired before anything runs.
-    const agent = await getAgent(action.agentId);
-    const gate = agent
-      ? await readPassportGate(agent.name, now)
-      : ({ state: "inactive", reason: "Agent not found." } as const);
-    if (gate.state === "unread") {
-      // ENS could not be read. Leave the approval pending so the owner can retry.
-      return "passport_unread";
-    }
-    if (gate.state === "inactive") {
-      await closeApproval(tx, loaded.value, {
-        status: "FAILED",
-        kind: "FAILED",
-        summary: `${gate.reason} Approval not executed: ${approval.reason}`,
-        failureReason: "PASSPORT_INACTIVE",
-        now,
-      });
-      return "passport_inactive";
-    }
-
-    const paid = action.action === "X402_PAYMENT";
-    if (paid) {
-      const settled = await settleAuthorizedPayment({
-        target: action.target,
-        token: action.token,
-        amount: action.amount,
-      });
-      if (!settled.ok) {
+      if (
+        !row.bindingHash ||
+        row.bindingHash !== seen.bindingHash ||
+        row.bindingHash !== computeBindingHash(bindingFields(row)) ||
+        !authorizationMatches(approval.authorization, action)
+      ) {
         await closeApproval(tx, loaded.value, {
           status: "FAILED",
           kind: "FAILED",
-          summary: `Payment failed after World ID approval: ${settled.error}`,
-          failureReason: "PAYMENT_FAILED",
+          summary: `Approval no longer matches the action: ${approval.reason}`,
+          failureReason: "BINDING",
           now,
         });
-        return "payment_failed";
+        return { ok: true, value: "binding" };
       }
-      action.reasons = [
-        ...action.reasons,
-        `x402 settled ${settled.value.txHash}`,
-      ];
-    }
 
-    const execution = await saveExecution(tx, action.id, now, paid);
-    await tx
-      .update(approvals)
-      .set({ status: "APPROVED", worldAuthTime: identity.authTime })
-      .where(eq(approvals.id, approval.id));
-    await tx
-      .update(actions)
-      .set({
-        status: "EXECUTED",
-        executionId: execution.id,
-        reasons: action.reasons,
-      })
-      .where(eq(actions.id, action.id));
-    await recordAudit(tx, {
-      agentId: action.agentId,
-      actionRequestId: action.id,
-      approvalId: approval.id,
-      kind: "APPROVED",
-      summary: `Approved with a fresh World ID proof: ${approval.reason}`,
-      createdAt: now,
-    });
-    console.log(
-      `${action.agentId} approval ${approval.id} -> APPROVED with World ID`,
-    );
-    return paid ? "paid" : "approved";
-  });
+      if (decision === "deny") {
+        await closeApproval(tx, loaded.value, {
+          status: "REJECTED",
+          kind: "REJECTED",
+          summary: `Denied in World App by ${shortWallet(signer)}: ${approval.reason}`,
+          decidedBy: signer,
+          now,
+        });
+        return { ok: true, value: "denied" };
+      }
+
+      // The agent's ENS name must still be registered and unexpired before anything runs.
+      const agent = await getAgent(action.agentId);
+      const gate = agent
+        ? await readPassportGate(agent.name, now)
+        : ({ state: "inactive", reason: "Agent not found." } as const);
+      if (gate.state === "unread") {
+        // ENS could not be read. Leave the approval pending so the owner can retry.
+        return { ok: true, value: "passport_unread" };
+      }
+      if (gate.state === "inactive") {
+        await closeApproval(tx, loaded.value, {
+          status: "FAILED",
+          kind: "FAILED",
+          summary: `${gate.reason} Approval not executed: ${approval.reason}`,
+          failureReason: "PASSPORT_INACTIVE",
+          decidedBy: signer,
+          now,
+        });
+        return { ok: true, value: "passport_inactive" };
+      }
+
+      const paid = action.action === "X402_PAYMENT";
+      if (paid) {
+        const settled = await settleAuthorizedPayment({
+          target: action.target,
+          token: action.token,
+          amount: action.amount,
+        });
+        if (!settled.ok) {
+          await closeApproval(tx, loaded.value, {
+            status: "FAILED",
+            kind: "FAILED",
+            summary: `Payment failed after World App approval: ${settled.error}`,
+            failureReason: "PAYMENT_FAILED",
+            decidedBy: signer,
+            now,
+          });
+          return { ok: true, value: "payment_failed" };
+        }
+        action.reasons = [
+          ...action.reasons,
+          `x402 settled ${settled.value.txHash}`,
+        ];
+      }
+
+      const execution = await saveExecution(tx, action.id, now, paid);
+      await tx
+        .update(approvals)
+        .set({ status: "APPROVED", decidedBy: signer, decidedAt: now })
+        .where(eq(approvals.id, approval.id));
+      await tx
+        .update(actions)
+        .set({
+          status: "EXECUTED",
+          executionId: execution.id,
+          reasons: action.reasons,
+        })
+        .where(eq(actions.id, action.id));
+      await recordAudit(tx, {
+        agentId: action.agentId,
+        actionRequestId: action.id,
+        approvalId: approval.id,
+        kind: "APPROVED",
+        summary: `Approved in World App by ${shortWallet(signer)}: ${approval.reason}`,
+        createdAt: now,
+      });
+      console.log(
+        `${action.agentId} approval ${approval.id} -> APPROVED in World App`,
+      );
+      return { ok: true, value: paid ? "paid" : "approved" };
+    },
+  );
 }

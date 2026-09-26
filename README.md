@@ -15,11 +15,11 @@ bun run dev
 
 The API applies database migrations on startup. More commands, including how to run the agent alone, are in [`docs/agent/commands.md`](docs/agent/commands.md).
 
-- Web: https://localhost:5173, or https://app.agentlatch.test:5173 after adding `127.0.0.1 app.agentlatch.test` to `/etc/hosts`. The certificate is self-signed.
+- Web: http://localhost:5173
 - API health: http://localhost:3001/health
 - Agent: background process started by `bun run dev`
 
-The API stores agents, policies, actions, approvals, and an audit log in Postgres. `PUT /agents/:id/policy` sets USDC limits. `POST /agents/:id/actions` returns allow, block, or an approval id. Approve or reject at `POST /approvals/:id/approve` and `POST /approvals/:id/reject`. The timeline is `GET /agents/:id/audit`. Field details are in `docs/agent/current-state.md`.
+The API stores agents, policies, actions, approvals, and an audit log in Postgres. `POST /agents/:id/actions` returns allow, block, or an approval id. An approval pushes to the agent's owner in World App. The owner approves or denies there with a wallet signature bound to that one action. The timeline is `GET /agents/:id/audit`. Field details are in `docs/agent/current-state.md`. The World App setup is in [`docs/agent/commands.md`](docs/agent/commands.md).
 
 ```sh
 bun run typecheck

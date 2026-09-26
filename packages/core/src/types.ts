@@ -90,8 +90,11 @@ export type ApprovalRequest = {
   expiresAt: string;
   createdAt: string;
   nonce: string;
-  /** Set when status is FAILED, for example WRONG_HUMAN. */
+  /** Set when status is FAILED, for example BINDING. */
   failureReason: string | null;
+  /** World App wallet that signed the approve or deny. */
+  decidedBy: string | null;
+  decidedAt: string | null;
   authorization: ScopedAuthorization;
 };
 

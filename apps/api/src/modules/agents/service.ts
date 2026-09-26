@@ -22,14 +22,12 @@ import {
 import { policyChange, policyFromTexts } from "./published";
 import { agents, policies } from "./schema";
 
-export async function createAgent(
-  name: string,
-  userId: string | null = null,
-): Promise<Agent> {
+/** New agents start unowned. The owner claims one from World App. */
+export async function createAgent(name: string): Promise<Agent> {
   const agent: Agent = {
     id: crypto.randomUUID(),
     name: name.trim(),
-    userId,
+    userId: null,
     createdAt: new Date().toISOString(),
   };
   const createdAt = new Date(agent.createdAt);
@@ -37,7 +35,7 @@ export async function createAgent(
     await tx.insert(agents).values({
       id: agent.id,
       name: agent.name,
-      userId,
+      userId: null,
       createdAt,
     });
     await recordAudit(tx, {
@@ -65,7 +63,7 @@ export async function getAgent(agentId: string): Promise<Agent | undefined> {
   return row ? toAgent(row) : undefined;
 }
 
-/** Gives an unowned agent to the signed-in owner. */
+/** Gives an unowned agent to the World App owner who signed the claim. */
 export async function claimAgent(
   agentId: string,
   userId: string,
@@ -95,7 +93,7 @@ export async function claimAgent(
     await recordAudit(tx, {
       agentId,
       kind: "AGENT_CLAIMED",
-      summary: `Agent ${row.name} claimed by its World ID owner.`,
+      summary: `Agent ${row.name} claimed in World App.`,
     });
     return { ok: true, value: toAgent(claimed[0] ?? row) };
   });

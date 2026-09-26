@@ -21,10 +21,11 @@ export const approvals = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     nonce: text("nonce").notNull(),
-    /** sha256 of the exact action. Sent to World as the step-up nonce. */
+    /** sha256 of the exact action. The World App decision nonce is derived from it. */
     bindingHash: text("binding_hash"),
-    stepUpStartedAt: timestamp("step_up_started_at", { withTimezone: true }),
-    worldAuthTime: timestamp("world_auth_time", { withTimezone: true }),
+    /** World App wallet that signed the approve or deny. */
+    decidedBy: text("decided_by"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
     failureReason: text("failure_reason"),
   },
   (table) => [

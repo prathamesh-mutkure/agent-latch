@@ -1,12 +1,11 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "../../db/client";
-import type { Failure, Success } from "../../result";
 import { users } from "./schema";
 
 export type User = {
   id: string;
   createdAt: string;
-  worldWallet: string | null;
+  worldWallet: string;
 };
 
 function toUser(row: typeof users.$inferSelect): User {
@@ -17,82 +16,37 @@ function toUser(row: typeof users.$inferSelect): User {
   };
 }
 
-function uniqueViolation(error: unknown): boolean {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "23505"
-  ) {
-    return true;
-  }
-  if (error instanceof Error && "cause" in error) {
-    return uniqueViolation(error.cause);
-  }
-  return false;
-}
-
-/** One row per World identity. Signing in twice returns the same row. */
-export async function upsertUser(iss: string, sub: string): Promise<User> {
+/** One owner per World App wallet. Linking twice returns the same row. */
+export async function upsertUserByWallet(worldWallet: string): Promise<User> {
+  const wallet = worldWallet.toLowerCase();
   const inserted = await db
     .insert(users)
     .values({
       id: crypto.randomUUID(),
-      worldIss: iss,
-      worldSub: sub,
+      worldWallet: wallet,
       createdAt: new Date(),
     })
-    .onConflictDoNothing({ target: [users.worldIss, users.worldSub] })
+    .onConflictDoNothing({ target: users.worldWallet })
     .returning();
-  const row =
-    inserted[0] ??
-    (
-      await db
-        .select()
-        .from(users)
-        .where(and(eq(users.worldIss, iss), eq(users.worldSub, sub)))
-        .limit(1)
-    )[0];
+  const row = inserted[0] ?? (await getUserRow(wallet));
   if (!row) {
     throw new Error("User upsert returned no row.");
   }
   return toUser(row);
 }
 
-export async function getUser(userId: string): Promise<User | undefined> {
+async function getUserRow(worldWallet: string) {
   const rows = await db
     .select()
     .from(users)
-    .where(eq(users.id, userId))
+    .where(eq(users.worldWallet, worldWallet.toLowerCase()))
     .limit(1);
-  const row = rows[0];
-  return row ? toUser(row) : undefined;
+  return rows[0];
 }
 
-/** Saves the World App wallet that notifications are addressed to. */
-export async function linkWallet(
-  userId: string,
+export async function getUserByWallet(
   worldWallet: string,
-): Promise<Success<User> | Failure> {
-  try {
-    const rows = await db
-      .update(users)
-      .set({ worldWallet })
-      .where(eq(users.id, userId))
-      .returning();
-    const row = rows[0];
-    if (!row) {
-      return { ok: false, status: 401, error: "Not signed in." };
-    }
-    return { ok: true, value: toUser(row) };
-  } catch (error) {
-    if (uniqueViolation(error)) {
-      return {
-        ok: false,
-        status: 409,
-        error: "This World App wallet is already linked to another owner.",
-      };
-    }
-    throw error;
-  }
+): Promise<User | undefined> {
+  const row = await getUserRow(worldWallet);
+  return row ? toUser(row) : undefined;
 }

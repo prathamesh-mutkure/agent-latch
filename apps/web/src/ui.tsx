@@ -1,6 +1,9 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
-import { useMe } from "./hooks";
+import { type Decision, decideApproval, getDecisionChallenge } from "./api";
+import { useWorldConfig } from "./hooks";
+import { insideWorldApp, miniAppUrl, signInWorldApp } from "./world";
 
 export function toneFor(kind: string): "allow" | "block" | "wait" | "neutral" {
   if (
@@ -142,7 +145,48 @@ export function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Approve and deny each need a fresh World ID proof from the agent's owner. */
+/** Link that opens a mini app page in World App. Outside World App only. */
+export function OpenInWorldApp({
+  path,
+  label,
+  detail,
+}: {
+  path: string;
+  label: string;
+  detail?: string;
+}) {
+  const config = useWorldConfig();
+  const appId = config.data?.appId;
+  if (config.isPending) {
+    return null;
+  }
+  if (!appId) {
+    return (
+      <p className="mt-4 text-sm text-muted">
+        Set WORLD_APP_ID on the API to use World App.
+      </p>
+    );
+  }
+  return (
+    <div className="mt-4 flex flex-col items-start gap-2">
+      <a
+        href={miniAppUrl(appId, path)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper"
+      >
+        {label}
+      </a>
+      {detail ? <p className="text-sm text-muted">{detail}</p> : null}
+    </div>
+  );
+}
+
+/**
+ * Approve and deny are signed in World App by the wallet that claimed the
+ * agent. Each signature covers this approval, this exact action, and this
+ * decision. Outside World App the page only links there.
+ */
 export function ApprovalActions({
   approvalId,
   label,
@@ -150,95 +194,87 @@ export function ApprovalActions({
   approvalId: string;
   label: string;
 }) {
-  const me = useMe();
+  if (!insideWorldApp) {
+    return (
+      <OpenInWorldApp
+        path={`/approve/${approvalId}`}
+        label="Decide in World App"
+        detail="The agent's owner approves or denies in World App. A claimed agent's owner gets a push."
+      />
+    );
+  }
+  return <WorldAppDecision approvalId={approvalId} label={label} />;
+}
+
+function WorldAppDecision({
+  approvalId,
+  label,
+}: {
+  approvalId: string;
+  label: string;
+}) {
   const navigate = useNavigate();
-  const [busy, setBusy] = useState<"approve" | "deny" | null>(null);
+  const queryClient = useQueryClient();
+  const [busy, setBusy] = useState<Decision | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function decide(decision: "approve" | "deny") {
+  async function decide(decision: Decision) {
+    setNote(null);
     setError(null);
     setBusy(decision);
-    const popup = window.open("", "agentlatch-world");
     try {
-      const response = await fetch(
-        `/auth/world/step-up?approval=${approvalId}&decision=${decision}`,
-        {
-          headers: {
-            accept: "application/json",
-            "ngrok-skip-browser-warning": "1",
-          },
-        },
-      );
-      const body = (await response.json()) as {
-        humanUrl?: string;
-        result?: string;
-        error?: string;
-      };
-      if (!response.ok) {
-        throw new Error(body.error ?? "World ID did not start.");
-      }
-      if (body.result) {
-        popup?.close();
-        await navigate({
-          to: "/approve/$approvalId",
-          params: { approvalId },
-          search: { result: body.result },
-        });
+      const challenge = await getDecisionChallenge(approvalId, decision);
+      const signed = await signInWorldApp(challenge);
+      if (!signed) {
+        setNote("You closed the World App prompt. Nothing changed.");
         return;
       }
-      if (body.humanUrl && popup) {
-        popup.location.href = body.humanUrl;
-      } else {
-        popup?.close();
-      }
+      const result = await decideApproval(approvalId, decision, signed);
+      await queryClient.invalidateQueries();
       await navigate({
         to: "/approve/$approvalId",
         params: { approvalId },
-        search: { handoff: "1" },
+        search: { result },
       });
     } catch (caught) {
-      popup?.close();
       setError(
-        caught instanceof Error ? caught.message : "World ID did not start.",
+        caught instanceof Error
+          ? caught.message
+          : "The decision did not go through.",
       );
     } finally {
       setBusy(null);
     }
   }
 
-  if (!me.data) {
-    return (
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <a
-          href="/auth/world/login"
-          className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper"
-        >
-          Sign in with World ID to decide
-        </a>
-      </div>
-    );
-  }
-
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-3">
-      <button
-        type="button"
-        className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper disabled:opacity-50"
-        aria-label={`Approve ${label} with World ID`}
-        disabled={busy !== null}
-        onClick={() => void decide("approve")}
-      >
-        {busy === "approve" ? "Opening World ID…" : "Approve with World ID"}
-      </button>
-      <button
-        type="button"
-        className="rounded-md border border-block px-4 py-2 text-sm font-medium text-block disabled:opacity-50"
-        aria-label={`Deny ${label} with World ID`}
-        disabled={busy !== null}
-        onClick={() => void decide("deny")}
-      >
-        {busy === "deny" ? "Opening World ID…" : "Deny with World ID"}
-      </button>
+    <div className="mt-4 grid gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className="flex-1 rounded-md bg-ink px-4 py-3 text-sm font-medium text-paper disabled:opacity-50"
+          aria-label={`Approve ${label}`}
+          disabled={busy !== null}
+          onClick={() => void decide("approve")}
+        >
+          {busy === "approve" ? "Signing…" : "Approve"}
+        </button>
+        <button
+          type="button"
+          className="flex-1 rounded-md border border-block px-4 py-3 text-sm font-medium text-block disabled:opacity-50"
+          aria-label={`Deny ${label}`}
+          disabled={busy !== null}
+          onClick={() => void decide("deny")}
+        >
+          {busy === "deny" ? "Signing…" : "Deny"}
+        </button>
+      </div>
+      {note ? (
+        <p role="status" className="text-sm text-muted">
+          {note}
+        </p>
+      ) : null}
       {error ? (
         <p role="alert" className="text-sm text-block">
           {error}

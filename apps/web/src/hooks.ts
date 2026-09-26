@@ -2,14 +2,13 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import {
   getApproval,
   getHealth,
-  getMe,
+  getOwner,
   getPolicy,
+  getWorldConfig,
   listActions,
   listAgents,
   listApprovals,
   listAudit,
-  listMyApprovals,
-  worldAppId,
 } from "./api";
 
 const live = {
@@ -107,30 +106,22 @@ export function useAllPolicies(agentIds: string[]) {
   });
 }
 
-export function useMe() {
+export function useWorldConfig() {
   return useQuery({
-    queryKey: ["me"],
-    queryFn: getMe,
-    refetchInterval: 30_000,
-    ...live,
-  });
-}
-
-export function useWorldAppId() {
-  return useQuery({
-    queryKey: ["world-app"],
-    queryFn: worldAppId,
+    queryKey: ["world-config"],
+    queryFn: getWorldConfig,
     staleTime: Number.POSITIVE_INFINITY,
     retry: 1,
   });
 }
 
-export function useMyApprovals(enabled: boolean) {
+/** Linked state, owned agents, and pending approvals for one World App wallet. */
+export function useOwner(wallet: string | null) {
   return useQuery({
-    queryKey: ["my-approvals"],
-    queryFn: listMyApprovals,
-    enabled,
-    refetchInterval: 2_000,
+    queryKey: ["owner", wallet],
+    queryFn: () => getOwner(wallet ?? ""),
+    enabled: Boolean(wallet),
+    refetchInterval: 3_000,
     ...live,
   });
 }

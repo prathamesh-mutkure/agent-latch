@@ -2,9 +2,10 @@ import {
   type AgentLatchClient,
   createAgentLatchClient,
 } from "@agentlatch/api-client";
+import type { SignedWalletAuth } from "./world";
 
 // Same origin as the page. Vite in dev, and Vercel in production, proxy /api
-// and /auth to the API. The ngrok header is forwarded so the free tunnel
+// to the API. Every call is a fetch with this header, so the free ngrok tunnel
 // returns JSON instead of its browser warning page.
 const tunnelHeaders = { "ngrok-skip-browser-warning": "1" };
 
@@ -12,12 +13,6 @@ export const client: AgentLatchClient = createAgentLatchClient(
   `${window.location.origin}/api`,
   tunnelHeaders,
 );
-
-function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-  const headers = new Headers(init?.headers);
-  headers.set("ngrok-skip-browser-warning", "1");
-  return fetch(path, { ...init, headers });
-}
 
 type CallResult<T> = {
   data: T | null;
@@ -118,115 +113,60 @@ export async function getApproval(approvalId: string) {
   return data;
 }
 
-// Approve and deny are full-page visits to
-// /auth/world/step-up?approval=:id&decision=approve|deny. The API starts World
-// ID, then the approve page polls until the human confirms on World's page.
+export type Decision = "approve" | "deny";
 
-export type StepUpStatus =
-  | { phase: "idle" }
-  | {
-      phase: "waiting";
-      humanUrl?: string;
-      connectorUri?: string;
-      worldStatus: string;
-    }
-  | { phase: "confirm"; decision: "approve" | "deny" }
-  | { phase: "done"; result: string };
-
-export async function stepUpStatus(): Promise<StepUpStatus> {
-  const response = await apiFetch("/auth/world/step-up/status");
-  const body = (await response.json()) as StepUpStatus & { error?: string };
-  if (!response.ok) {
-    throw new Error(body.error ?? "Could not check World ID.");
-  }
-  if (
-    body.phase !== "idle" &&
-    body.phase !== "waiting" &&
-    body.phase !== "confirm" &&
-    body.phase !== "done"
-  ) {
-    throw new Error("World ID status was not recognized.");
-  }
-  return body;
-}
-
-export async function confirmStepUp(): Promise<string> {
-  const response = await apiFetch("/auth/world/step-up/confirm", {
-    method: "POST",
-  });
-  const body = (await response.json()) as { result?: string; error?: string };
-  if (!response.ok || !body.result) {
-    throw new Error(body.error ?? "Could not confirm the World ID decision.");
-  }
-  return body.result;
-}
-
-export async function getMe() {
-  const result = await client.me.get();
-  if (result.status === 401) {
-    return null;
-  }
-  const data = await read(Promise.resolve(result));
-  if (isErrorBody(data)) {
-    throw new Error(data.error);
-  }
-  return data;
-}
-
-export async function signOut() {
-  await apiFetch("/auth/logout", { method: "POST" });
-}
-
-export async function worldAppId(): Promise<string | null> {
-  const response = await apiFetch("/auth/world/app");
-  if (!response.ok) {
-    return null;
-  }
-  const body = (await response.json()) as { appId?: string | null };
-  return body.appId ?? null;
+export function getWorldConfig() {
+  return read(client.world.config.get());
 }
 
 export async function worldNonce(): Promise<string> {
-  const response = await apiFetch("/auth/world/nonce");
-  const body = (await response.json()) as { nonce?: string; error?: string };
-  if (!response.ok || !body.nonce) {
-    throw new Error(body.error ?? "Could not start the wallet link.");
-  }
-  return body.nonce;
+  const data = await read(client.world.nonce.get());
+  return data.nonce;
 }
 
-export async function saveWorldWallet(payload: {
-  address: string;
-  message: string;
-  signature: string;
-}): Promise<void> {
-  const response = await apiFetch("/auth/world/wallet", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const body = (await response.json()) as { error?: string };
-  if (!response.ok) {
-    throw new Error(body.error ?? "Could not link the World App wallet.");
-  }
-}
-
-export async function listMyApprovals() {
-  const data = await read(client.me.approvals.get());
-  if (isErrorBody(data) || !Array.isArray(data)) {
-    throw new Error(
-      isErrorBody(data) ? data.error : "Unexpected approvals response.",
-    );
-  }
-  return data;
-}
-
-export async function claimAgent(agentId: string) {
-  const data = await read(client.agents({ agentId }).claim.post());
+/** Links the World App wallet that signed. With `agentId`, also claims that agent. */
+export async function linkWorldApp(body: {
+  nonce: string;
+  agentId?: string;
+  payload: SignedWalletAuth;
+}) {
+  const data = await read(client.world.link.post(body));
   if (isErrorBody(data)) {
     throw new Error(data.error);
   }
   return data;
+}
+
+export function getOwner(wallet: string) {
+  return read(client.world.owner({ wallet }).get());
+}
+
+/** What World App must sign to approve or deny this one approval. */
+export async function getDecisionChallenge(
+  approvalId: string,
+  decision: Decision,
+) {
+  const data = await read(
+    client.approvals({ approvalId }).challenge.get({ query: { decision } }),
+  );
+  if (isErrorBody(data)) {
+    throw new Error(data.error);
+  }
+  return data;
+}
+
+export async function decideApproval(
+  approvalId: string,
+  decision: Decision,
+  payload: SignedWalletAuth,
+): Promise<string> {
+  const data = await read(
+    client.approvals({ approvalId }).decide.post({ decision, payload }),
+  );
+  if (isErrorBody(data)) {
+    throw new Error(data.error);
+  }
+  return data.result;
 }
 
 export type AgentRecord = Awaited<ReturnType<typeof listAgents>>[number];

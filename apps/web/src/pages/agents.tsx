@@ -1,7 +1,5 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { claimAgent } from "../api";
-import { useAgents, useAllActions, useMe } from "../hooks";
+import { useAgents, useAllActions } from "../hooks";
 import { agentPosture } from "../model";
 import { Empty, PageHeader, Pill, QueryGate } from "../ui";
 
@@ -10,7 +8,6 @@ export function AgentsPage() {
   const agentIds = agents.data?.map((agent) => agent.id) ?? [];
   const actionQueries = useAllActions(agentIds);
   const actions = actionQueries.flatMap((query) => query.data ?? []);
-  const me = useMe();
 
   return (
     <>
@@ -57,26 +54,7 @@ export function AgentsPage() {
                         : "No roles granted"}
                     </p>
                   </Link>
-                  {!agent.userId ? (
-                    me.data ? (
-                      <ClaimButton agentId={agent.id} />
-                    ) : (
-                      <a
-                        href="/auth/world/login"
-                        className="mt-2 inline-block text-sm underline"
-                      >
-                        Sign in with World ID to claim
-                      </a>
-                    )
-                  ) : me.data && agent.userId === me.data.id ? (
-                    <p className="mt-2 text-xs text-muted">
-                      You own this agent.
-                    </p>
-                  ) : (
-                    <p className="mt-2 text-xs text-muted">
-                      Owned by another World ID.
-                    </p>
-                  )}
+                  <OwnerLine claimed={Boolean(agent.userId)} />
                 </li>
               );
             })}
@@ -87,31 +65,21 @@ export function AgentsPage() {
   );
 }
 
-export function ClaimButton({ agentId }: { agentId: string }) {
-  const queryClient = useQueryClient();
-  const claim = useMutation({
-    mutationFn: () => claimAgent(agentId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries();
-    },
-  });
+export function OwnerLine({ claimed }: { claimed: boolean }) {
+  if (claimed) {
+    return (
+      <p className="mt-2 text-xs text-muted">
+        Claimed in World App. Approvals push to its owner.
+      </p>
+    );
+  }
   return (
-    <div className="mt-2 flex items-center gap-3">
-      <button
-        type="button"
-        className="rounded-md border border-ink px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-        disabled={claim.isPending}
-        onClick={() => claim.mutate()}
-      >
-        {claim.isPending ? "Claiming…" : "Claim as owner"}
-      </button>
-      {claim.error ? (
-        <p role="alert" className="text-sm text-block">
-          {claim.error instanceof Error
-            ? claim.error.message
-            : "Request failed."}
-        </p>
-      ) : null}
-    </div>
+    <p className="mt-2 text-xs text-muted">
+      Unclaimed.{" "}
+      <Link to="/mini" className="underline">
+        Claim it in World App
+      </Link>{" "}
+      so approvals reach you.
+    </p>
   );
 }

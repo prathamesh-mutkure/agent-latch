@@ -23,7 +23,7 @@ import { policyFromTexts } from "../agents/published";
 import { getAgent } from "../agents/service";
 import { openApproval } from "../approvals/service";
 import { recordAudit } from "../audit/service";
-import { notifyAction } from "../notify/service";
+import { notifyApproval } from "../notify/service";
 import { toAction } from "./dto";
 import { actions, executions } from "./schema";
 
@@ -221,13 +221,14 @@ export async function submitAction(input: {
   console.log(
     `${action.agentId} ${action.action} ${formatUsdc(action.amount)} USDC -> ${action.decision}`,
   );
-  await notifyAction({
-    userId: agent.userId,
-    decision: action.decision,
-    action: action.action,
-    amount: action.amount,
-    approvalId: action.approvalRequestId,
-  });
+  if (action.decision === "HUMAN_APPROVAL" && action.approvalRequestId) {
+    void notifyApproval({
+      agentId: action.agentId,
+      approvalId: action.approvalRequestId,
+      action: action.action,
+      amount: action.amount,
+    });
+  }
   return { ok: true, value: action };
 }
 

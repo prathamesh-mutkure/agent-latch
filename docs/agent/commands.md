@@ -42,13 +42,11 @@ curl -X POST "http://localhost:3001/agents/<agentId>/ens"
 
 That requires `EXECUTOR_PRIVATE_KEY` for the owner of `ENS_PARENT_NAME` (default `agent-latch.eth`) and Sepolia ETH for gas. The route deploys a UserRegistry if the parent has none, links it with `setSubregistry` and `setParent`, then registers the agent label.
 
-```sh
-# while it is waiting on the 2500 USDC swap
-curl -X POST "http://localhost:3001/approvals/<approvalId>/approve"
-curl -X POST "http://localhost:3001/approvals/<approvalId>/reject"
-```
+While it waits on the 2500 USDC swap, only the agent's owner can decide, in World App (see below). There is no curl approve. The agent's reads stay open:
 
-The dashboard at http://localhost:5173 calls those same routes.
+```sh
+curl "http://localhost:3001/approvals/<approvalId>"
+```
 
 `X402_PAYMENT` screens `target` with the Intercepta quick scan before execution. Set `INTERCEPTA_API_KEY`. A missing key refuses the payment. Swaps do not call Intercepta.
 
@@ -86,18 +84,22 @@ bun run db:migrate
 
 ## World App
 
-The API stays on port 3001. World redirects the browser to `WORLD_REDIRECT_URI`, which is `https://app.agentlatch.test:5173/auth/world/callback` locally. Vite proxies `/auth` to the API. A phone cannot open that name.
-
-For a phone, one public HTTPS host must serve the web app and proxy `/auth` and `/api` to the API. Set `WORLD_REDIRECT_URI` to `https://<that-host>/auth/world/callback` and register that exact URI. Set the Developer Portal mini app URL to `https://<that-host>`. Add `WORLD_APP_ID` and `WORLD_NOTIFICATION_API_KEY`, and enable notifications for the mini app.
-
-`apps/web/vercel.json` only falls back to the SPA. Put these rewrites above that fallback, with the real API origin:
+World App must open the web app on a public HTTPS host, and that host proxies `/api` to the API. Live, that is Vercel with the rewrite in `apps/web/vercel.json`:
 
 ```json
-{ "source": "/auth/(.*)", "destination": "https://<api-host>/auth/$1" },
 { "source": "/api/(.*)", "destination": "https://<api-host>/$1" }
 ```
 
-On that host, sign in with World ID, open `/mini`, link World App, allow notifications, and claim `trader`. The background agent then pushes on each tick. Raise `AGENT_INTERVAL_MS` if the phone should not get a push every 10 seconds.
+For a local API behind ngrok:
+
+```sh
+ngrok http 3001
+# put the https host in apps/web/vercel.json, then redeploy apps/web
+```
+
+Set the Developer Portal mini app URL to that web host. Set `WORLD_APP_ID` and `WORLD_NOTIFICATION_API_KEY` in `.env` for the API. `WORLDCHAIN_RPC_URL` is optional.
+
+On the phone: open the mini app in World App, tap Claim on the agent, sign, and allow notifications. When the agent goes past its rules, the push opens `/approve/<id>`. Tap Approve or Deny and sign. The desktop dashboard shows the same approval with a "Decide in World App" link.
 
 ## Checks
 

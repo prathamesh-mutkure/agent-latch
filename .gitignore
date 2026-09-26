@@ -10,3 +10,4 @@ coverage
 out
 cache
 broadcast
+.cursor/mcp.json

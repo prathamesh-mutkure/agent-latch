@@ -1,7 +1,6 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { Link, Outlet } from "@tanstack/react-router";
-import { signOut } from "./api";
-import { useApprovals, useHealth, useMe } from "./hooks";
+import { useApprovals, useHealth } from "./hooks";
+import { insideWorldApp } from "./world";
 
 const links = [
   { to: "/", label: "Overview", exact: true },
@@ -14,6 +13,20 @@ const links = [
 ] as const;
 
 export function Shell() {
+  return insideWorldApp ? <WorldAppShell /> : <ConsoleShell />;
+}
+
+function WorldAppShell() {
+  return (
+    <div className="min-h-screen bg-paper text-ink">
+      <main className="mx-auto w-full max-w-xl px-5 py-6">
+        <Outlet />
+      </main>
+    </div>
+  );
+}
+
+function ConsoleShell() {
   const health = useHealth();
   const approvals = useApprovals();
   const pending =
@@ -48,7 +61,6 @@ export function Shell() {
             </Link>
           ))}
         </nav>
-        <Owner />
         <p className="hidden px-6 pb-6 text-xs text-paper/50 md:block">
           Sepolia · {apiUp ? "API up" : "API unreachable"}
         </p>
@@ -56,43 +68,6 @@ export function Shell() {
       <main className="mx-auto w-full max-w-5xl px-6 py-8 md:px-10 md:py-10">
         <Outlet />
       </main>
-    </div>
-  );
-}
-
-function Owner() {
-  const me = useMe();
-  const queryClient = useQueryClient();
-  if (me.isPending) {
-    return null;
-  }
-  if (!me.data) {
-    return (
-      <div className="px-6 pb-4">
-        <a
-          href="/auth/world/login"
-          className="block rounded-md bg-paper px-3 py-2 text-center text-sm font-medium text-ink"
-        >
-          Sign in with World ID
-        </a>
-      </div>
-    );
-  }
-  return (
-    <div className="px-6 pb-4 text-xs text-paper/70">
-      <p>
-        Owner <span className="font-mono">{me.data.id.slice(0, 8)}</span>
-      </p>
-      <button
-        type="button"
-        className="mt-1 underline"
-        onClick={async () => {
-          await signOut();
-          await queryClient.invalidateQueries();
-        }}
-      >
-        Sign out
-      </button>
     </div>
   );
 }
