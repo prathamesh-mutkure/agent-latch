@@ -12,6 +12,7 @@ export const sepoliaEns = {
   universalResolver: "0x5d25c1d6acbb71b7a28aa7899618a3412a8303e3",
   verifiableFactory: "0x9e726eb570beb6bceb495ab8cda7df517d4e841c",
   userRegistryImpl: "0xa80338aaa8d23831cea25e858d1774534abb0263",
+  permissionedResolverImpl: "0x14f09fd05d4585759e54844dc9b00147131cf243",
   defaultRpcUrl: "https://ethereum-sepolia-rpc.publicnode.com",
   defaultParentName: "agent-latch.eth",
 } as const;
@@ -98,6 +99,23 @@ export const permissionedRegistryAbi = [
     ],
     outputs: [],
   },
+  {
+    type: "function",
+    name: "getResolver",
+    stateMutability: "view",
+    inputs: [{ name: "label", type: "string" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "setResolver",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "anyId", type: "uint256" },
+      { name: "resolver", type: "address" },
+    ],
+    outputs: [],
+  },
 ] as const;
 
 /** Permissioned Registry roles. Values are from the ENSv2 registry docs. */
@@ -124,6 +142,13 @@ export const allRegistryRoles =
   0x1111111111111111111111111111111111111111111111111111111111111111n;
 
 export const verifiableFactoryAbi = [
+  {
+    type: "function",
+    name: "proxyLogic",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
   {
     type: "function",
     name: "deployProxy",

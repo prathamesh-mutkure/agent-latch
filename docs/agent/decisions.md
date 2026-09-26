@@ -126,6 +126,12 @@ Supersedes the parts of `planning-v2.md` that use Base, a Hono seller service, d
 - Stack stays this repo: Elysia, Drizzle, and the current packages. `GET /x402/resource` is the paid resource. Do not add a Hono seller app. Do not rename the product. Do not replace `ActionRequest` with `POST /api/v1/fetch`.
 - Signer custody and the World approval shape stay open in `open-questions.md`.
 
+## 2026-09-26 — ENS name gates actions
+
+- `POST /agents/:id/ens` deploys one Permissioned Resolver for the signer when needed, points the name at it, and writes the signer's ETH address with `setAddress`. A name that is already registered is updated instead of registered again.
+- `submitAction` records `BLOCK` when the name is not `REGISTERED` or is expired. An ENS read failure returns 503 and does not execute. Approve uses the same check before execution.
+- Policy still comes from Postgres. Policy text records are not written.
+
 ## How to change a decision
 
 Add a new dated section that names what it supersedes. Leave the old section in place and mark it superseded.

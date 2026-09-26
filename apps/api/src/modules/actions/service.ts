@@ -17,6 +17,7 @@ import { db } from "../../db/client";
 import { saveExecution } from "../../executor";
 import { settleAuthorizedPayment } from "../../payments";
 import type { Failure, Success } from "../../result";
+import { readPassportGate } from "../agents/passport";
 import { getAgent, getPolicy } from "../agents/service";
 import { openApproval } from "../approvals/service";
 import { recordAudit } from "../audit/service";
@@ -57,7 +58,8 @@ export async function submitAction(input: {
   token?: string;
   note?: string;
 }): Promise<Success<ActionRequest> | Failure> {
-  if (!(await getAgent(input.agentId))) {
+  const agent = await getAgent(input.agentId);
+  if (!agent) {
     return { ok: false, status: 404, error: "Agent not found." };
   }
 
@@ -74,14 +76,21 @@ export async function submitAction(input: {
   const now = new Date();
   const token = (input.token ?? USDC_SEPOLIA_ADDRESS).toLowerCase();
   const target = input.target.trim();
-  let decision = evaluatePolicy({
-    policy: await getPolicy(input.agentId),
-    action: input.action,
-    target,
-    token,
-    amount,
-    spentToday: await spentToday(input.agentId, now),
-  });
+  const passport = await readPassportGate(agent.name, now);
+  if (passport.state === "unread") {
+    return { ok: false, status: 503, error: passport.error };
+  }
+  let decision =
+    passport.state === "inactive"
+      ? { decision: "BLOCK" as const, reasons: [passport.reason] }
+      : evaluatePolicy({
+          policy: await getPolicy(input.agentId),
+          action: input.action,
+          target,
+          token,
+          amount,
+          spentToday: await spentToday(input.agentId, now),
+        });
 
   if (input.action === "X402_PAYMENT" && decision.decision !== "BLOCK") {
     const screened = await screenPayee(target);

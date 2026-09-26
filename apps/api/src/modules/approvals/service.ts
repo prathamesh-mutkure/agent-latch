@@ -11,6 +11,8 @@ import { settleAuthorizedPayment } from "../../payments";
 import type { Failure, Success } from "../../result";
 import { toAction } from "../actions/dto";
 import { actions } from "../actions/schema";
+import { passportFailure, readPassportGate } from "../agents/passport";
+import { getAgent } from "../agents/service";
 import { expireDue, recordAudit } from "../audit/service";
 import { toApproval } from "./dto";
 import { approvals } from "./schema";
@@ -135,6 +137,17 @@ export async function resolveApproval(
         status: 409,
         error: "Approval does not match the action.",
       };
+    }
+
+    if (outcome === "approve") {
+      const agent = await getAgent(action.agentId);
+      if (!agent) {
+        return { ok: false, status: 404, error: "Agent not found." };
+      }
+      const blocked = passportFailure(await readPassportGate(agent.name, now));
+      if (blocked) {
+        return blocked;
+      }
     }
 
     if (outcome === "approve" && action.action === "X402_PAYMENT") {

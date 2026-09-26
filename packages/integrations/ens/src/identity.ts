@@ -17,6 +17,11 @@ import {
   registryRoles,
   sepoliaEns,
 } from "./config";
+import {
+  ensureOwnedResolver,
+  pointResolver,
+  writeEthAddress,
+} from "./resolver";
 import { resolveNameWithSdk } from "./sdk";
 
 const nameStatuses = ["AVAILABLE", "RESERVED", "REGISTERED"] as const;
@@ -227,32 +232,63 @@ export async function registerEnsSubname(input: {
   if (!isAddress(configured)) {
     throw new Error("ENS_REGISTRY_ADDRESS is not an address.");
   }
-  const wallet = createWalletClient({
+  const rpcUrl = input.rpcUrl ?? sepoliaEns.defaultRpcUrl;
+  const resolver = await ensureOwnedResolver({ rpcUrl, account });
+  const current = await resolveEnsIdentity(normalized, {
+    rpcUrl,
+    registryAddress: configured,
+  });
+  if (current.status !== "REGISTERED") {
+    const wallet = createWalletClient({
+      account,
+      chain: sepolia,
+      transport: http(rpcUrl),
+    });
+    const expiry = BigInt(Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365);
+    const hash = await wallet.writeContract({
+      address: configured,
+      abi: permissionedRegistryAbi,
+      functionName: "register",
+      args: [
+        normalized,
+        owner,
+        zeroAddress,
+        resolver,
+        registrationRoleBitmap,
+        expiry,
+      ],
+    });
+    const publicClient = createPublicClient({
+      chain: sepolia,
+      transport: http(rpcUrl),
+    });
+    await publicClient.waitForTransactionReceipt({ hash });
+  }
+  await pointResolver({
+    rpcUrl,
     account,
-    chain: sepolia,
-    transport: http(input.rpcUrl ?? sepoliaEns.defaultRpcUrl),
+    registry: configured,
+    label: normalized,
+    resolver,
   });
-  const expiry = BigInt(Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365);
-  const hash = await wallet.writeContract({
-    address: configured,
-    abi: permissionedRegistryAbi,
-    functionName: "register",
-    args: [
-      normalized,
-      owner,
-      zeroAddress,
-      zeroAddress,
-      registrationRoleBitmap,
-      expiry,
-    ],
+  const named = await resolveEnsIdentity(normalized, {
+    rpcUrl,
+    registryAddress: configured,
   });
-  const publicClient = createPublicClient({
-    chain: sepolia,
-    transport: http(input.rpcUrl ?? sepoliaEns.defaultRpcUrl),
-  });
-  await publicClient.waitForTransactionReceipt({ hash });
+  if (!named.name) {
+    throw new Error("ENS name did not resolve after registration.");
+  }
+  if (named.address?.toLowerCase() !== account.address.toLowerCase()) {
+    await writeEthAddress({
+      rpcUrl,
+      account,
+      resolver,
+      name: named.name,
+      address: account.address,
+    });
+  }
   return resolveEnsIdentity(normalized, {
-    rpcUrl: input.rpcUrl,
+    rpcUrl,
     registryAddress: configured,
   });
 }

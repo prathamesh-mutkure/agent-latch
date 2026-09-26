@@ -23,5 +23,5 @@ Do not close these in code until he writes the choice in `decisions.md`.
 
 1. Phase 5. World check on the existing approval path. Leave the signer alone.
 2. Custody. No code until the open question is closed.
-3. After the Postgres policy path is finished: refuse an action when the ENS name is missing or expired, and set the resolver plus the `addr` record. Policy rows stay in Postgres.
+3. Done. An action is refused when the ENS name is missing or expired. Registration sets the resolver and the ETH address. Policy rows stay in Postgres.
 4. Last: publish policy onto ENS records. A looser policy edit needs a fresh approval. Tighter edits can keep writing immediately.

@@ -25,6 +25,11 @@ import {
   verifiableFactoryAbi,
 } from "./config";
 import { type EnsIdentity, resolveEnsIdentity } from "./identity";
+import {
+  ensureOwnedResolver,
+  pointResolver,
+  writeEthAddress,
+} from "./resolver";
 
 function parentLabelOf(parentName: string): string {
   const normalized = parentName.trim().toLowerCase();
@@ -168,27 +173,58 @@ export async function registerUnderParent(input: {
       subregistry,
     });
   }
-  const wallet = createWalletClient({
+  const label = input.label.trim().toLowerCase();
+  const resolver = await ensureOwnedResolver({ rpcUrl, account });
+  const current = await resolveEnsIdentity(label, {
+    rpcUrl,
+    registryAddress: subregistry,
+  });
+  if (current.status !== "REGISTERED") {
+    const wallet = createWalletClient({
+      account,
+      chain: sepolia,
+      transport: http(rpcUrl),
+    });
+    const expiry = BigInt(Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365);
+    const hash = await wallet.writeContract({
+      address: subregistry,
+      abi: permissionedRegistryAbi,
+      functionName: "register",
+      args: [
+        label,
+        owner,
+        zeroAddress,
+        resolver,
+        registrationRoleBitmap,
+        expiry,
+      ],
+    });
+    await publicClient(rpcUrl).waitForTransactionReceipt({ hash });
+  }
+  await pointResolver({
+    rpcUrl,
     account,
-    chain: sepolia,
-    transport: http(rpcUrl),
+    registry: subregistry,
+    label,
+    resolver,
   });
-  const expiry = BigInt(Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365);
-  const hash = await wallet.writeContract({
-    address: subregistry,
-    abi: permissionedRegistryAbi,
-    functionName: "register",
-    args: [
-      input.label.trim().toLowerCase(),
-      owner,
-      zeroAddress,
-      zeroAddress,
-      registrationRoleBitmap,
-      expiry,
-    ],
+  const named = await resolveEnsIdentity(label, {
+    rpcUrl,
+    registryAddress: subregistry,
   });
-  await publicClient(rpcUrl).waitForTransactionReceipt({ hash });
-  return resolveEnsIdentity(input.label, {
+  if (!named.name) {
+    throw new Error("ENS name did not resolve after registration.");
+  }
+  if (named.address?.toLowerCase() !== account.address.toLowerCase()) {
+    await writeEthAddress({
+      rpcUrl,
+      account,
+      resolver,
+      name: named.name,
+      address: account.address,
+    });
+  }
+  return resolveEnsIdentity(label, {
     rpcUrl,
     registryAddress: subregistry,
   });
