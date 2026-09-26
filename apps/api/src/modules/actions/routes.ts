@@ -1,14 +1,19 @@
 import { Elysia } from "elysia";
+import { readAgentAccess } from "../../agent-key";
 import { respond } from "../../result";
 import { type ActionDto, toActionDto } from "./dto";
 import { actionIdParams, agentIdParams, submitActionBody } from "./schemas";
 import { getAction, listActions, submitAction } from "./service";
 
 export const actionRoutes = new Elysia()
-  // The agent and the MCP server use these. They stay open until agents authenticate with a key.
+  // Submitting spends, so it takes the agent key. The owner session is not enough.
   .post(
     "/agents/:agentId/actions",
-    async ({ params, body, set }) => {
+    async ({ params, body, headers, set }) => {
+      const access = await readAgentAccess(params.agentId, headers, "key");
+      if (!access.ok) {
+        return respond(set, access);
+      }
       const result = await submitAction({
         agentId: params.agentId,
         action: body.action,
@@ -29,7 +34,20 @@ export const actionRoutes = new Elysia()
   )
   .get(
     "/agents/:agentId/actions",
-    async ({ params, set }): Promise<ActionDto[] | { error: string }> => {
+    async ({
+      params,
+      headers,
+      set,
+    }): Promise<ActionDto[] | { error: string }> => {
+      const access = await readAgentAccess(
+        params.agentId,
+        headers,
+        "owner-or-key",
+      );
+      if (!access.ok) {
+        set.status = access.status;
+        return { error: access.error };
+      }
       const result = await listActions(params.agentId);
       if (!result.ok) {
         set.status = result.status;
@@ -41,11 +59,19 @@ export const actionRoutes = new Elysia()
   )
   .get(
     "/actions/:actionId",
-    async ({ params, set }) => {
+    async ({ params, headers, set }) => {
       const action = await getAction(params.actionId);
       if (!action) {
         set.status = 404;
         return { error: "Action not found." };
+      }
+      const access = await readAgentAccess(
+        action.agentId,
+        headers,
+        "owner-or-key",
+      );
+      if (!access.ok) {
+        return respond(set, access);
       }
       return toActionDto(action);
     },

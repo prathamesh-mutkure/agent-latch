@@ -1,4 +1,7 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
+import { useState } from "react";
+import { issueAgentKey } from "../api";
 import {
   useActions,
   useAgents,
@@ -71,6 +74,9 @@ export function AgentPage() {
             </h1>
             <Pill>{posture}</Pill>
             <Pill>{agent.ens.status}</Pill>
+          </div>
+          <div className="mb-4">
+            <AgentKey agentId={agent.id} hasKey={agent.hasKey} />
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <Stat
@@ -218,5 +224,85 @@ export function AgentPage() {
         </>
       )}
     </QueryGate>
+  );
+}
+
+function AgentKey({ agentId, hasKey }: { agentId: string; hasKey: boolean }) {
+  const queryClient = useQueryClient();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [key, setKey] = useState<string | null>(null);
+  const snippet = `{
+  "mcpServers": {
+    "agentlatch": {
+      "command": "bun",
+      "args": ["apps/mcp/src/index.ts"],
+      "env": {
+        "API_URL": "http://localhost:3001",
+        "AGENT_ID": "${agentId}",
+        "AGENT_KEY": "<the key shown once>"
+      }
+    }
+  }
+}`;
+
+  async function onIssue() {
+    setPending(true);
+    setError(null);
+    try {
+      const issued = await issueAgentKey(agentId);
+      setKey(issued.key);
+      await queryClient.invalidateQueries({ queryKey: ["agents"] });
+    } catch (issueError) {
+      setError(
+        issueError instanceof Error
+          ? issueError.message
+          : "Could not create a key.",
+      );
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Panel title="Agent key">
+      {key ? (
+        <div className="grid gap-2">
+          <p className="text-sm font-medium">
+            Copy this key now. It is not shown again.
+            {hasKey ? " The previous key no longer works." : ""}
+          </p>
+          <textarea
+            readOnly
+            className="rounded-md border border-line bg-card p-3 font-mono text-sm"
+            rows={3}
+            value={key}
+          />
+        </div>
+      ) : (
+        <>
+          <p className="text-sm text-muted">
+            {hasKey
+              ? "A key is set. Replacing it stops the old one. The background agent and Claude read AGENT_KEY from the environment."
+              : "This agent has no key, so it cannot act. Create one and put it in AGENT_KEY."}
+          </p>
+          <button
+            type="button"
+            disabled={pending}
+            className="mt-3 rounded-md border border-ink px-4 py-2 text-sm font-medium disabled:opacity-50"
+            onClick={() => void onIssue()}
+          >
+            {pending ? "Creating…" : hasKey ? "Replace key" : "Create key"}
+          </button>
+        </>
+      )}
+      {error ? <p className="mt-2 text-sm text-block">{error}</p> : null}
+      <h3 className="mt-5 text-sm font-medium tracking-wide text-muted">
+        Connect to Claude
+      </h3>
+      <pre className="mt-2 overflow-x-auto rounded-md border border-line p-3 font-mono text-xs">
+        {snippet}
+      </pre>
+    </Panel>
   );
 }

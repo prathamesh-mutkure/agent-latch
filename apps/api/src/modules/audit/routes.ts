@@ -1,14 +1,21 @@
 import { Elysia } from "elysia";
+import { readAgentAccess } from "../../agent-key";
 import { respond } from "../../result";
-import { session } from "../../session";
 import { agentIdParams } from "../agents/schemas";
 import { listAudit } from "./service";
 
-export const auditRoutes = new Elysia().use(session).get(
+export const auditRoutes = new Elysia().get(
   "/agents/:agentId/audit",
-  async ({ params, owner, set }) => {
-    const result = await listAudit(params.agentId, owner.userId);
-    return respond(set, result);
+  async ({ params, headers, set }) => {
+    const access = await readAgentAccess(
+      params.agentId,
+      headers,
+      "owner-or-key",
+    );
+    if (!access.ok) {
+      return respond(set, access);
+    }
+    return respond(set, await listAudit(params.agentId));
   },
-  { params: agentIdParams, signedIn: true },
+  { params: agentIdParams },
 );

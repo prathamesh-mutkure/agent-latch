@@ -1,4 +1,4 @@
-import { agentId, apiUrl } from "./env";
+import { agentId, agentKey, apiUrl } from "./env";
 
 export type Merchant = {
   id: string;
@@ -39,7 +39,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     response = await fetch(`${apiUrl}${path}`, {
       ...init,
-      headers: { "content-type": "application/json", ...init?.headers },
+      headers: {
+        "content-type": "application/json",
+        ...(agentKey ? { "x-agent-key": agentKey } : {}),
+        ...init?.headers,
+      },
       signal: AbortSignal.timeout(120_000),
     });
   } catch {
@@ -60,6 +64,11 @@ function currentAgentId(): string {
   if (!agentId) {
     throw new ApiError(
       "Set AGENTLATCH_AGENT_ID or AGENT_ID to the agent this server pays as.",
+    );
+  }
+  if (!agentKey) {
+    throw new ApiError(
+      "Set AGENT_KEY to the key shown once on that agent's page.",
     );
   }
   return agentId;
@@ -87,7 +96,48 @@ export async function submitPayment(input: {
 }
 
 export function getAction(actionId: string): Promise<Action> {
+  currentAgentId();
   return request<Action>(`/actions/${actionId}`);
+}
+
+export function submitSwap(input: {
+  amountUsdc: string;
+  note?: string;
+}): Promise<Action> {
+  const id = currentAgentId();
+  return request<Action>(`/agents/${id}/actions`, {
+    method: "POST",
+    body: JSON.stringify({
+      action: "SWAP",
+      target: "0xvenue",
+      amount: input.amountUsdc,
+      note: input.note,
+    }),
+  });
+}
+
+export type Approval = { id: string; status: string };
+
+export function getApproval(approvalId: string): Promise<Approval> {
+  return request<Approval>(`/approvals/${approvalId}`);
+}
+
+export function getPolicy(): Promise<unknown> {
+  const id = currentAgentId();
+  return request(`/agents/${id}/policy`);
+}
+
+export type AuditEvent = {
+  id: string;
+  kind: string;
+  summary: string;
+  createdAt: string;
+};
+
+export async function recentActivity(): Promise<AuditEvent[]> {
+  const id = currentAgentId();
+  const events = await request<AuditEvent[]>(`/agents/${id}/audit`);
+  return events.slice(-20);
 }
 
 export async function listPayments(): Promise<Action[]> {

@@ -18,7 +18,8 @@ export type AuditKind =
   | "EXPIRED"
   | "CANCELLED"
   | "FAILED"
-  | "AGENT_CLAIMED";
+  | "AGENT_CLAIMED"
+  | "AGENT_KEY_ISSUED";
 
 export type AuditEventDto = {
   id: string;
@@ -54,12 +55,11 @@ export async function recordAudit(
 
 export async function listAudit(
   agentId: string,
-  userId: string,
 ): Promise<Success<AuditEventDto[]> | Failure> {
   const existing = await db
     .select({ id: agents.id })
     .from(agents)
-    .where(and(eq(agents.id, agentId), eq(agents.userId, userId)))
+    .where(eq(agents.id, agentId))
     .limit(1);
   if (!existing[0]) {
     return { ok: false, status: 404, error: "Agent not found." };

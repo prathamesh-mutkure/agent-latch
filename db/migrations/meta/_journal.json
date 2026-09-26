@@ -43,6 +43,13 @@
       "when": 1790460000000,
       "tag": "0005_owner_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790470000000,
+      "tag": "0006_agent_keys",
+      "breakpoints": true
     }
   ]
 }

@@ -30,6 +30,8 @@ export type Agent = {
   name: string;
   /** Owner who approves this agent's exceptional actions. Null only for agents made before owner accounts. */
   userId: string | null;
+  /** Whether an agent key has been issued. The key itself is never on this object. */
+  hasKey: boolean;
   createdAt: string;
 };
 

@@ -57,6 +57,52 @@ export function getHealth() {
   return read(client.health.get());
 }
 
+export async function createAgent(name: string): Promise<{
+  id: string;
+  key: string;
+  setupError: string | null;
+}> {
+  const data: unknown = await read(client.agents.post({ name }));
+  if (
+    typeof data !== "object" ||
+    data === null ||
+    !("id" in data && "key" in data) ||
+    typeof data.id !== "string" ||
+    typeof data.key !== "string"
+  ) {
+    throw new Error("Agent was not created.");
+  }
+  return {
+    id: data.id,
+    key: data.key,
+    setupError:
+      "setupError" in data && typeof data.setupError === "string"
+        ? data.setupError
+        : null,
+  };
+}
+
+export async function issueAgentKey(agentId: string): Promise<{ key: string }> {
+  const data: unknown = await read(client.agents({ agentId }).key.post());
+  if (
+    typeof data !== "object" ||
+    data === null ||
+    !("key" in data) ||
+    typeof data.key !== "string"
+  ) {
+    throw new Error("Key was not created.");
+  }
+  return { key: data.key };
+}
+
+export async function registerAgentEns(agentId: string) {
+  const data = await read(client.agents({ agentId }).ens.post({}));
+  if (isErrorBody(data)) {
+    throw new Error(data.error);
+  }
+  return data;
+}
+
 export async function listAgents() {
   const data = await read(client.agents.get());
   if (!Array.isArray(data)) {

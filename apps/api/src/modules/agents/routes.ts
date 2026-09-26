@@ -1,4 +1,5 @@
 import { Elysia, t } from "elysia";
+import { readAgentAccess } from "../../agent-key";
 import { respond } from "../../result";
 import { session } from "../../session";
 import { toPolicyDto } from "./dto";
@@ -8,6 +9,7 @@ import {
   createAgent,
   getOwnedAgent,
   getPolicy,
+  issueAgentKey,
   listAgents,
   setPolicy,
 } from "./service";
@@ -26,7 +28,15 @@ export const agentsRoutes = new Elysia({ prefix: "/agents" })
       if (!created.ok) {
         return respond(set, created);
       }
-      return agentWithEns(created.value);
+      const policy = await setPolicy(created.value.agent.id, owner.userId, {
+        autonomousLimit: "500",
+        hardLimit: "5000",
+      });
+      return {
+        ...(await agentWithEns(created.value.agent)),
+        key: created.value.key,
+        setupError: policy.ok ? null : policy.error,
+      };
     },
     { body: createAgentBody, signedIn: true },
   )
@@ -47,6 +57,17 @@ export const agentsRoutes = new Elysia({ prefix: "/agents" })
         return { error: "Agent not found." };
       }
       return agentWithEns(agent);
+    },
+    { params: agentIdParams, signedIn: true },
+  )
+  .post(
+    "/:agentId/key",
+    async ({ params, owner, set }) => {
+      const issued = await issueAgentKey(params.agentId, owner.userId);
+      if (!issued.ok) {
+        return respond(set, issued);
+      }
+      return issued.value;
     },
     { params: agentIdParams, signedIn: true },
   )
@@ -98,10 +119,19 @@ export const agentsRoutes = new Elysia({ prefix: "/agents" })
   )
   .get(
     "/:agentId/policy",
-    async ({ params, owner, set }) => {
-      if (!(await getOwnedAgent(params.agentId, owner.userId))) {
-        set.status = 404;
-        return { error: "Agent not found." };
+    async ({
+      params,
+      headers,
+      set,
+    }): Promise<ReturnType<typeof toPolicyDto> | { error: string }> => {
+      const access = await readAgentAccess(
+        params.agentId,
+        headers,
+        "owner-or-key",
+      );
+      if (!access.ok) {
+        set.status = access.status;
+        return { error: access.error };
       }
       const policy = await getPolicy(params.agentId);
       if (!policy) {
@@ -110,5 +140,5 @@ export const agentsRoutes = new Elysia({ prefix: "/agents" })
       }
       return toPolicyDto(policy);
     },
-    { params: agentIdParams, signedIn: true },
+    { params: agentIdParams },
   );

@@ -29,7 +29,7 @@ Do not close these in code until he writes the choice in `decisions.md`.
 Multi-user, in this order:
 
 1. Done. Owner accounts: World App sign-in on the phone and by QR on the computer, a session on owner routes, each owner sees only their own agents (`decisions.md`, "Owner accounts"). Action submits and reads stay open for `apps/mcp`.
-2. Agent registration and agent keys. Registering creates the agent and its ENS name and shows an agent key once. Action submits, action reads, and the agent's approval reads require the key. The background agent and `apps/mcp` read the key from `.env`.
-3. Done as a stdio server, not a route on the API. `apps/mcp` (`decisions.md`, "MCP server for x402 payments"): `list_merchants`, `quote_resource`, `pay_resource`, `get_payment`, `list_payments`. The model's `note` is already on `pay_resource`. Extra tools (`request_swap`, `wait_for_approval`, `get_policy`, `recent_activity`) and a "Connect to Claude" panel come after agent keys, on this server. No second MCP endpoint, no built-in chat, no model key on AgentLatch.
+2. Done. Agent registration and agent keys (`decisions.md`, "Agent keys"). The register button creates the agent, shows the key once, and registers the ENS name. Submitting requires the key. The approval page stays open for World App. The background agent and `apps/mcp` read `AGENT_KEY` from `.env`.
+3. Done as a stdio server, not a route on the API. `apps/mcp` (`decisions.md`, "MCP server for x402 payments", then "Agent keys"): `list_merchants`, `quote_resource`, `pay_resource`, `get_payment`, `list_payments`, `request_swap`, `wait_for_approval`, `get_policy`, `recent_activity`. A "Connect to Claude" panel is on the agent's page. No second MCP endpoint, no built-in chat, no model key on AgentLatch.
 4. Test-request buttons on the agent's page.
 5. Optional, not planned: a built-in chat box.

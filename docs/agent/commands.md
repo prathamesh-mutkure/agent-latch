@@ -32,7 +32,7 @@ bun --filter @agentlatch/agent dev
 bun --filter @agentlatch/agent dev
 ```
 
-It acts for the agent in `AGENT_ID` and cycles three mocked swaps: 100 USDC (allow), 2500 USDC (waits for approval), 10000 USDC (block). It does not approve itself, list agents, create agents, or change policy. Without `AGENT_ID` it idles. Copy the ID from the agent's page in the dashboard.
+It acts for the agent in `AGENT_ID` and sends `AGENT_KEY` as `x-agent-key`. It cycles three mocked swaps: 100 USDC (allow), 2500 USDC (waits for approval), 10000 USDC (block). It does not approve itself, list agents, create agents, or change policy. Without `AGENT_ID` and `AGENT_KEY` it idles. Copy both from the agent's page. The key is shown once.
 
 Owner routes need a session: `Authorization: Bearer <token>`. Sign in on the dashboard, then copy the token from local storage key `agentlatch.session` (field `token`). `GET /agents/:id` adds an `ens` object read from Sepolia ENSv2. Register the agent's label with:
 
@@ -73,9 +73,9 @@ AGENT_POLL_MS=2000
 
 ## MCP server
 
-`apps/mcp` is a stdio MCP server for AI agents. It talks to the API at `API_URL` and pays as `AGENTLATCH_AGENT_ID`, else `AGENT_ID`. It holds no key. Every payment is an `X402_PAYMENT` action, so the ENS policy, Intercepta, and World approval apply. Listing agents needs an owner session, so the server does not look an agent up by name.
+`apps/mcp` is a stdio MCP server for AI agents. It talks to the API at `API_URL` and pays as `AGENTLATCH_AGENT_ID`, else `AGENT_ID`, sending `AGENT_KEY` as `x-agent-key`. Every payment is an `X402_PAYMENT` action, so the ENS policy, Intercepta, and World approval apply. Listing agents needs an owner session, so the server does not look an agent up by name.
 
-Tools: `list_merchants` (`GET /x402/merchants`), `quote_resource` (reads the 402 quote, pays nothing), `pay_resource` (`url`, `maxAmountUsdc`, `note`; refuses a price above the maximum), `get_payment`, `list_payments`.
+Tools: `list_merchants` (`GET /x402/merchants`), `quote_resource` (reads the 402 quote, pays nothing), `pay_resource` (`url`, `maxAmountUsdc`, `note`; refuses a price above the maximum), `get_payment`, `list_payments`, `request_swap`, `wait_for_approval` (polls for 45 seconds), `get_policy`, `recent_activity`.
 
 ```sh
 bun apps/mcp/src/index.ts
@@ -90,7 +90,11 @@ Cursor or Claude Desktop:
     "agentlatch": {
       "command": "bun",
       "args": ["/absolute/path/to/agent-latch/apps/mcp/src/index.ts"],
-      "env": { "API_URL": "http://localhost:3001", "AGENT_ID": "<agent id>" }
+      "env": {
+        "API_URL": "http://localhost:3001",
+        "AGENT_ID": "<agent id>",
+        "AGENT_KEY": "<agent key>"
+      }
     }
   }
 }

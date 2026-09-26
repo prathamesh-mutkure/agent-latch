@@ -16,6 +16,8 @@ export const agents = pgTable(
     name: text("name").notNull(),
     /** Owner who approves this agent's exceptional actions. */
     userId: uuid("user_id").references(() => users.id),
+    /** SHA-256 of the agent key. The key itself is shown once and never stored. */
+    keyHash: text("key_hash"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   },
   (table) => [uniqueIndex("agents_name_unique").on(sql`lower(${table.name})`)],

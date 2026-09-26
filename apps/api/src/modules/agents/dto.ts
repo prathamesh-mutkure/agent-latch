@@ -10,6 +10,7 @@ export function toAgent(row: AgentRow): Agent {
     id: row.id,
     name: row.name,
     userId: row.userId,
+    hasKey: row.keyHash !== null,
     createdAt: row.createdAt.toISOString(),
   };
 }

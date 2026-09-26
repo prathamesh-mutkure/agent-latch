@@ -9,6 +9,7 @@ import {
   UsdcAmountError,
 } from "@agentlatch/core";
 import { and, eq } from "drizzle-orm";
+import { generateAgentKey } from "../../agent-key";
 import { db } from "../../db/client";
 import type { Failure, Success } from "../../result";
 import { recordAudit } from "../audit/service";
@@ -33,15 +34,17 @@ function isUniqueViolation(error: unknown): boolean {
   return false;
 }
 
-/** An agent belongs to the owner who created it from the start. */
+/** An agent belongs to the owner who created it. The key is returned once. */
 export async function createAgent(
   name: string,
   userId: string,
-): Promise<Success<Agent> | Failure> {
+): Promise<Success<{ agent: Agent; key: string }> | Failure> {
+  const { key, hash } = generateAgentKey();
   const agent: Agent = {
     id: crypto.randomUUID(),
     name,
     userId,
+    hasKey: true,
     createdAt: new Date().toISOString(),
   };
   const createdAt = new Date(agent.createdAt);
@@ -51,6 +54,7 @@ export async function createAgent(
         id: agent.id,
         name: agent.name,
         userId,
+        keyHash: hash,
         createdAt,
       });
       await recordAudit(tx, {
@@ -70,7 +74,35 @@ export async function createAgent(
     }
     throw error;
   }
-  return { ok: true, value: agent };
+  return { ok: true, value: { agent, key } };
+}
+
+/** Replaces the agent key. The new key is returned once; the old one stops working. */
+export async function issueAgentKey(
+  agentId: string,
+  userId: string,
+): Promise<Success<{ key: string }> | Failure> {
+  const agent = await getOwnedAgent(agentId, userId);
+  if (!agent) {
+    return { ok: false, status: 404, error: "Agent not found." };
+  }
+  const { key, hash } = generateAgentKey();
+  const createdAt = new Date();
+  await db.transaction(async (tx) => {
+    await tx
+      .update(agents)
+      .set({ keyHash: hash })
+      .where(and(eq(agents.id, agentId), eq(agents.userId, userId)));
+    await recordAudit(tx, {
+      agentId,
+      kind: "AGENT_KEY_ISSUED",
+      summary: agent.hasKey
+        ? "Replaced the agent key. The previous key no longer works."
+        : "Created the agent key.",
+      createdAt,
+    });
+  });
+  return { ok: true, value: { key } };
 }
 
 export async function listAgents(userId: string): Promise<Agent[]> {

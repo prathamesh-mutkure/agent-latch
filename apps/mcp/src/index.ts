@@ -6,9 +6,13 @@ import { z } from "zod";
 import {
   type Action,
   getAction,
+  getApproval,
+  getPolicy,
   listMerchants,
   listPayments,
+  recentActivity,
   submitPayment,
+  submitSwap,
 } from "./api";
 import { quote } from "./quote";
 
@@ -149,6 +153,84 @@ server.registerTool(
   async ({ actionId }) => {
     try {
       return reply(payment(await getAction(actionId)));
+    } catch (error) {
+      return refuse(error);
+    }
+  },
+);
+
+server.registerTool(
+  "request_swap",
+  {
+    title: "Request a swap",
+    description:
+      "Asks AgentLatch to swap USDC. The agent's ENS policy decides: it runs now, waits for a human in World App, or blocks.",
+    inputSchema: {
+      amountUsdc: z.string().describe("USDC amount, for example 100 or 2500."),
+      note: z.string().optional().describe("Why the agent is swapping."),
+    },
+    annotations: { destructiveHint: true },
+  },
+  async ({ amountUsdc, note }) => {
+    try {
+      return reply(payment(await submitSwap({ amountUsdc, note })));
+    } catch (error) {
+      return refuse(error);
+    }
+  },
+);
+
+server.registerTool(
+  "wait_for_approval",
+  {
+    title: "Wait for an approval",
+    description:
+      "Polls one approval for up to 45 seconds. Returns when it is no longer pending, or while it is still pending.",
+    inputSchema: { approvalId: z.uuid() },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ approvalId }) => {
+    try {
+      const deadline = Date.now() + 45_000;
+      let approval = await getApproval(approvalId);
+      while (approval.status === "PENDING" && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 2_000));
+        approval = await getApproval(approvalId);
+      }
+      return reply(approval);
+    } catch (error) {
+      return refuse(error);
+    }
+  },
+);
+
+server.registerTool(
+  "get_policy",
+  {
+    title: "Get the agent policy",
+    description:
+      "Reads this agent's spending policy: autonomous limit, hard limit, and what it may do.",
+    annotations: { readOnlyHint: true },
+  },
+  async () => {
+    try {
+      return reply(await getPolicy());
+    } catch (error) {
+      return refuse(error);
+    }
+  },
+);
+
+server.registerTool(
+  "recent_activity",
+  {
+    title: "Recent activity",
+    description: "The last 20 audit events for this agent, oldest first.",
+    annotations: { readOnlyHint: true },
+  },
+  async () => {
+    try {
+      return reply(await recentActivity());
     } catch (error) {
       return refuse(error);
     }

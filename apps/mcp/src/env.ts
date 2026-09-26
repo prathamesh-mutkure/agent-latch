@@ -25,3 +25,5 @@ export const apiUrl = process.env.API_URL ?? "http://localhost:3001";
  */
 export const agentId =
   process.env.AGENTLATCH_AGENT_ID || process.env.AGENT_ID || undefined;
+/** Shown once on the agent's page. Sent as `x-agent-key`. */
+export const agentKey = process.env.AGENT_KEY?.trim() || undefined;

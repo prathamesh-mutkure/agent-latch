@@ -20,5 +20,7 @@ if (existsSync(rootEnv)) {
 export const apiUrl = process.env.API_URL ?? "http://localhost:3001";
 /** The agent this process acts for. Its owner creates it in AgentLatch first. */
 export const agentId = process.env.AGENT_ID?.trim() || null;
+/** Shown once on the agent's page. Sent as `x-agent-key`. */
+export const agentKey = process.env.AGENT_KEY?.trim() || null;
 export const intervalMs = Number(process.env.AGENT_INTERVAL_MS ?? 10_000);
 export const pollMs = Number(process.env.AGENT_POLL_MS ?? 2_000);

@@ -1,5 +1,5 @@
 import { type ApprovalResult, apiHealth, getApproval, submitSwap } from "./api";
-import { agentId, intervalMs, pollMs } from "./env";
+import { agentId, agentKey, intervalMs, pollMs } from "./env";
 import { nextTick } from "./market";
 
 function sleep(ms: number): Promise<void> {
@@ -33,9 +33,9 @@ async function waitForDecision(approvalId: string): Promise<ApprovalResult> {
 }
 
 async function run(): Promise<void> {
-  if (!agentId) {
+  if (!agentId || !agentKey) {
     console.log(
-      "agent idle: set AGENT_ID to the id of an agent you own (the /agents/<id> page in the dashboard)",
+      "agent idle: set AGENT_ID and AGENT_KEY from the agent's page in the dashboard",
     );
     return;
   }

@@ -51,7 +51,9 @@ Handoff for the next agent. Settled choices stay in `decisions.md`. Do not relit
 
 15. **Sessions end when `SESSION_SECRET` changes.** Without it, the API makes a random secret per process, so every restart signs everyone out. Keep one in `.env`. The web app drops a session on any 401 and shows sign-in again. Sessions last 24 hours and cannot be revoked early.
 
-16. **The agent's endpoints are still open.** `POST /agents/:id/actions`, `GET /agents/:id/actions`, `GET /actions/:id`, and `GET /approvals/:id` take no session. `apps/mcp` submits and reads payments there. Anyone with an agent ID can submit for it and read its actions. Agent keys (step 2 in `continuation.md`) close this. Owner lists, policy, audit, and approvals stay closed.
+16. **`pilot` has no agent key yet.** Open its page, create a key, and put that key in `AGENT_KEY` next to `AGENT_ID`. Until then the background agent idles and Claude cannot act for it. The key is shown once. Replacing it stops the old one.
+
+17. **`GET /approvals/:id` stays open.** World App opens it from a push without the agent key. Submitting an action requires `x-agent-key`. Action, policy, and audit reads take the key or the owner's session.
 
 ## Do not
 

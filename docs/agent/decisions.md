@@ -261,7 +261,7 @@ Supersedes "MCP server and SDK packages" in the cut column of `planning-v2.md`. 
 - `apps/mcp` is a stdio MCP server. It is a client of the API, not a signer. It holds no key and never builds a `PAYMENT-SIGNATURE`. A payment is an `X402_PAYMENT` action, so the order stays policy, then Intercepta, then signing, and a payment above the autonomous limit waits for World approval.
 - Tools: `list_merchants`, `quote_resource`, `pay_resource`, `get_payment`, `list_payments`. `pay_resource` takes the agent's `maxAmountUsdc`, quotes the URL, and submits the quoted price only when it is at or below that maximum.
 - The merchant registry is `GET /x402/merchants` on the API. For now it lists AgentLatch's own demo seller, the only payee its facilitator settles for. No Bazaar discovery.
-- The agent is picked by `AGENTLATCH_AGENT_ID` or `AGENT_NAME`. The API has no agent keys yet, so anyone who can reach the API can submit as any agent. The pasted-key login in `planning-v2.md` future work is still open.
+- The agent is picked by `AGENTLATCH_AGENT_ID` or `AGENT_NAME`. The API has no agent keys yet, so anyone who can reach the API can submit as any agent. The pasted-key login in `planning-v2.md` future work is still open. Superseded by "Agent keys": the server sends `AGENT_KEY`, and submitting without it is refused.
 
 ## 2026-09-27 — Owner accounts
 
@@ -273,10 +273,23 @@ Supersedes, in "World App is the only human surface": "no sessions", the link an
 - Session: a bearer token, `base64url(claims).HMAC-SHA256` over user ID, wallet, and expiry, signed with `SESSION_SECRET` (API only). Lasts 24 hours. The browser keeps it in local storage and sends `Authorization: Bearer`. There is no server-side revocation. Signing out drops the token. Without `SESSION_SECRET` the API makes a random secret per process, so sign-ins end on restart.
 - Desktop sign-in by QR: `POST /world/pair` returns an 8-character code and a 32-byte secret. The QR opens `/pair/<code>` in World App. `GET /world/pair/:code` returns the challenge (request ID `pair-<code>`, a statement naming the code). The phone signs it and posts to `POST /world/pair/:code`, which signs the phone in too. The computer polls `POST /world/pair/:code/session` with the secret and gets its session once. Codes live in API memory for 5 minutes and work once. Only the computer holds the secret, so seeing the QR is not enough to take the session.
 - Owner only, 401 without a session, 404 for another owner's agent: `GET /agents`, `GET /agents/:id`, `POST /agents`, policy read and write, `POST /agents/:id/ens`, `GET /agents/:id/audit`, `GET /approvals`, and `GET /me` (replaces `GET /world/owner/:wallet`).
-- Still open, because `apps/mcp` submits and reads payments with no owner session: `POST /agents/:id/actions`, `GET /agents/:id/actions`, `GET /actions/:id`, and `GET /approvals/:id`. The MCP server pays as `AGENTLATCH_AGENT_ID`, else `AGENT_ID`. It does not look agents up by name. That supersedes the name lookup in "MCP server for x402 payments". Agent keys close these routes later. The challenge and `decide` stay signature-gated, not session-gated.
+- Still open, because `apps/mcp` submits and reads payments with no owner session: `POST /agents/:id/actions`, `GET /agents/:id/actions`, `GET /actions/:id`, and `GET /approvals/:id`. The MCP server pays as `AGENTLATCH_AGENT_ID`, else `AGENT_ID`. It does not look agents up by name. That supersedes the name lookup in "MCP server for x402 payments". Agent keys close these routes later. The challenge and `decide` stay signature-gated, not session-gated. Superseded by "Agent keys" for the action routes. `GET /approvals/:id` stays open.
 - `POST /agents` creates the agent owned by the caller. The name is the ENS label: 3 to 32 lower-case letters, digits, and dashes, unique ignoring case (migration 0005). A taken name is 409.
 - The background agent acts for `AGENT_ID` and never lists or creates agents. Without it the process idles.
 - `pilot` was already owned by `0xe5f5617c6996cd0f1b6afe02856f23f46296ad5c`, so no owner moved.
+
+## 2026-09-27 — Agent keys
+
+Supersedes the open action routes in "Owner accounts" and the "no agent keys yet" sentence in "MCP server for x402 payments". Step 2 of the multi-user plan in `continuation.md`.
+
+- Why: anyone who knew an agent id could submit an action for it. The agent now has its own key, separate from the owner's sign-in.
+- `POST /agents` creates the agent, stores only the SHA-256 of a new key, and returns the key once (`alk_` plus 32 random bytes). It also saves the demo policy, 500 USDC autonomous and 5000 hard. The register button then calls `POST /agents/:id/ens`, which spends Sepolia gas. `POST /agents/:id/key` replaces the key and returns the new one once. The old key stops working. The key is never logged or stored.
+- The agent and `apps/mcp` send it as `x-agent-key`. The owner's bearer token stays `Authorization`. `AGENT_KEY` in `.env` is what the background agent and the MCP server send.
+- `POST /agents/:id/actions` requires the key. The owner's session is not enough.
+- `GET /agents/:id/actions`, `GET /actions/:id`, `GET /agents/:id/policy`, and `GET /agents/:id/audit` accept the key or the owner's session. Another owner's session is 404.
+- `GET /approvals/:id` stays open. World App opens that page from a push without the agent key. The background agent polls it the same way.
+- Agents created before this, including `pilot`, have no key until the owner creates one on the agent's page.
+- `apps/mcp` also gained `request_swap`, `wait_for_approval` (polls for 45 seconds), `get_policy`, and `recent_activity`.
 
 ## How to change a decision
 

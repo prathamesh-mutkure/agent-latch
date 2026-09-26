@@ -1,4 +1,4 @@
-import { apiUrl } from "./env";
+import { agentKey, apiUrl } from "./env";
 
 export type ActionResult = {
   id: string;
@@ -30,6 +30,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: {
       "content-type": "application/json",
+      ...(agentKey ? { "x-agent-key": agentKey } : {}),
       ...init?.headers,
     },
   });
