@@ -3,45 +3,99 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
-  Outlet,
+  Link,
   RouterProvider,
 } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
+import { ActivityPage } from "./pages/activity";
+import { AgentPage } from "./pages/agent";
+import { AgentsPage } from "./pages/agents";
+import { ApprovalsPage } from "./pages/approvals";
+import { OverviewPage } from "./pages/overview";
+import { PaymentsPage } from "./pages/payments";
+import { PoliciesPage } from "./pages/policies";
+import { Shell } from "./shell";
 
 const rootRoute = createRootRoute({
-  component: () => (
-    <div className="min-h-screen bg-white text-zinc-950">
-      <Outlet />
-    </div>
-  ),
+  component: Shell,
 });
 
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  component: function HomePage() {
+  component: OverviewPage,
+});
+
+const agentsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/agents",
+  component: AgentsPage,
+});
+
+const agentRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/agents/$agentId",
+  component: AgentPage,
+});
+
+const policiesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/policies",
+  component: PoliciesPage,
+});
+
+const activityRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/activity",
+  component: ActivityPage,
+});
+
+const approvalsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/approvals",
+  component: ApprovalsPage,
+});
+
+const paymentsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/payments",
+  component: PaymentsPage,
+});
+
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  agentsRoute,
+  agentRoute,
+  policiesRoute,
+  activityRoute,
+  approvalsRoute,
+  paymentsRoute,
+]);
+
+const router = createRouter({
+  routeTree,
+  defaultNotFoundComponent: function NotFound() {
     return (
-      <main className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center gap-4 px-6">
-        <p className="text-sm font-medium tracking-wide text-zinc-500">
-          AgentLatch
-        </p>
-        <h1 className="text-4xl font-semibold tracking-tight text-zinc-950">
-          Control plane for autonomous agents
-        </h1>
-        <p className="max-w-xl text-lg text-zinc-600">
-          The control plane is the API on port 3001. It allows, blocks, or asks
-          for approval. The dashboard comes later.
-        </p>
-      </main>
+      <div>
+        <h1 className="text-3xl font-semibold">Page not found</h1>
+        <Link to="/" className="mt-4 inline-block text-sm underline">
+          Overview
+        </Link>
+      </div>
     );
   },
 });
 
-const routeTree = rootRoute.addChildren([indexRoute]);
-const router = createRouter({ routeTree });
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchIntervalInBackground: true,
+      retry: 1,
+    },
+  },
+});
 
 declare module "@tanstack/react-router" {
   interface Register {

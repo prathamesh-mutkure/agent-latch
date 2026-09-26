@@ -48,6 +48,8 @@ curl -X POST "http://localhost:3001/approvals/<approvalId>/approve"
 curl -X POST "http://localhost:3001/approvals/<approvalId>/reject"
 ```
 
+The dashboard at http://localhost:5173 calls those same routes.
+
 Env, all optional:
 
 ```sh

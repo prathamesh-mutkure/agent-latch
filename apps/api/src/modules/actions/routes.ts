@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { respond } from "../../result";
-import { toActionDto } from "./dto";
+import { type ActionDto, toActionDto } from "./dto";
 import { actionIdParams, agentIdParams, submitActionBody } from "./schemas";
 import { getAction, listActions, submitAction } from "./service";
 
@@ -28,10 +28,11 @@ export const actionRoutes = new Elysia()
   )
   .get(
     "/agents/:agentId/actions",
-    async ({ params, set }) => {
+    async ({ params, set }): Promise<ActionDto[] | { error: string }> => {
       const result = await listActions(params.agentId);
       if (!result.ok) {
-        return respond(set, result);
+        set.status = result.status;
+        return { error: result.error };
       }
       return Promise.all(result.value.map((action) => toActionDto(action)));
     },

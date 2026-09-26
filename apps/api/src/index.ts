@@ -1,4 +1,5 @@
 import "./env";
+import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
 import { applyMigrations } from "./db/migrate";
 import { actionRoutes } from "./modules/actions/routes";
@@ -8,11 +9,14 @@ import { auditRoutes } from "./modules/audit/routes";
 import { healthRoutes } from "./modules/health/routes";
 
 export const app = new Elysia()
+  .use(cors())
   .use(healthRoutes)
   .use(agentsRoutes)
   .use(actionRoutes)
   .use(approvalRoutes)
   .use(auditRoutes);
+
+export type App = typeof app;
 
 if (import.meta.main) {
   await applyMigrations();

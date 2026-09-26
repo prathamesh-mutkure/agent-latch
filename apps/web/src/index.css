@@ -1,1 +1,32 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Avenir Next", "Segoe UI", sans-serif;
+  --color-ink: #1b1914;
+  --color-paper: #f3f0e8;
+  --color-card: #fffcf7;
+  --color-line: #e3ddd0;
+  --color-muted: #6e685c;
+  --color-allow: #1c6b45;
+  --color-allow-soft: #e5f4ec;
+  --color-block: #8f2d2d;
+  --color-block-soft: #f8e8e6;
+  --color-wait: #8a5a10;
+  --color-wait-soft: #f8efd8;
+}
+
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}

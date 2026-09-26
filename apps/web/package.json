@@ -9,6 +9,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@agentlatch/api-client": "workspace:*",
+    "@agentlatch/core": "workspace:*",
     "@tanstack/react-query": "^5.103.2",
     "@tanstack/react-router": "^1.170.39",
     "react": "^19.3.0",

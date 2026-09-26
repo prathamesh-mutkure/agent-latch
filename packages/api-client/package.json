@@ -1,0 +1,16 @@
+{
+  "name": "@agentlatch/api-client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agentlatch/api": "workspace:*",
+    "@elysiajs/eden": "^1.4.9"
+  }
+}
