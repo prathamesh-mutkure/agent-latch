@@ -57,14 +57,26 @@ export function AgentsPage() {
                         : "No roles granted"}
                     </p>
                   </Link>
-                  {me.data && !agent.userId ? (
-                    <ClaimButton agentId={agent.id} />
-                  ) : null}
-                  {me.data && agent.userId === me.data.id ? (
+                  {!agent.userId ? (
+                    me.data ? (
+                      <ClaimButton agentId={agent.id} />
+                    ) : (
+                      <a
+                        href="/auth/world/login"
+                        className="mt-2 inline-block text-sm underline"
+                      >
+                        Sign in with World ID to claim
+                      </a>
+                    )
+                  ) : me.data && agent.userId === me.data.id ? (
                     <p className="mt-2 text-xs text-muted">
                       You own this agent.
                     </p>
-                  ) : null}
+                  ) : (
+                    <p className="mt-2 text-xs text-muted">
+                      Owned by another World ID.
+                    </p>
+                  )}
                 </li>
               );
             })}
