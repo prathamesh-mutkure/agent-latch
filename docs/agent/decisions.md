@@ -241,6 +241,18 @@ Supersedes the one-product bullet, the approve half of the decide bullet, and th
 - Public reads expose `worldIdStatus` and `worldIdError`. The device code, user code, link, and `sub` never appear there.
 - Env on the API only: `WORLD_OIDC_ISSUER`, `WORLD_CLIENT_ID`, `WORLD_CLIENT_SECRET`. Missing values make approve 503. `WORLD_REDIRECT_URI` stays registered in the portal because device clients still need one, but the code does not read it. `COOKIE_SECRET` is unused.
 
+## 2026-09-27 — AgentLatch runs its own x402 facilitator
+
+Supersedes the self-settled payment and the `?tx=` receipt check on `GET /x402/resource`.
+
+- Why: public facilitators do not settle on Ethereum Sepolia, and payments stay on Sepolia. The buyer used to broadcast its own transfer and hand the seller a transaction hash. That is not x402, so the same agent could not pay a real seller. The receipt check also accepted any successful USDC transfer, whatever the payee or amount.
+- x402 v2 headers. The seller quotes 402 with `PAYMENT-REQUIRED`. The buyer retries with `PAYMENT-SIGNATURE`, a signed EIP-3009 authorization that nobody has broadcast. The seller answers 200 with `PAYMENT-RESPONSE`.
+- The facilitator is `POST /facilitator/verify`, `POST /facilitator/settle`, and `GET /facilitator/supported` on the API. Verify checks the scheme, network, and asset, that the payee and amount match the requirement exactly, the time window, the signature against `from`, the payer's USDC balance, and that the nonce is unused. Settle verifies again, then broadcasts `transferWithAuthorization` and pays gas.
+- The facilitator settles only for AgentLatch's own seller payee (`X402_PAY_TO`), so strangers cannot spend its gas. Key: `FACILITATOR_PRIVATE_KEY`, else `EXECUTOR_PRIVATE_KEY`.
+- The demo seller calls the facilitator over HTTP at `FACILITATOR_URL` (default `http://localhost:$PORT/facilitator`), as a real seller would.
+- `X402_PAYMENT.target` is the resource URL, not the payee. On submit the API asks the URL for its quote. The quote must be exact Sepolia USDC for exactly the action's amount. Intercepta screens the quote's `payTo`. After an allow, the executor key signs and the API retries the URL. An approved payment quotes and screens again before it signs, because the seller may have changed its payee.
+- Unchanged: policy, the order policy then Intercepta then signing, one `LocalKeySigner`. Signer custody is still open.
+
 ## How to change a decision
 
 Add a new dated section that names what it supersedes. Leave the old section in place and mark it superseded.

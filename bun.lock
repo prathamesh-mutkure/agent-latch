@@ -87,6 +87,9 @@
         "@agentlatch/x402": "workspace:*",
         "viem": "^2.47.6",
       },
+      "devDependencies": {
+        "@types/bun": "^1.4.2",
+      },
     },
     "packages/integrations/ens": {
       "name": "@agentlatch/ens",
@@ -120,6 +123,9 @@
       "version": "0.0.0",
       "dependencies": {
         "@agentlatch/core": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "^1.4.2",
       },
     },
     "packages/signers/local": {

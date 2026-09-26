@@ -48,17 +48,16 @@ While it waits on the 2500 USDC swap, only the agent's owner can decide, in Worl
 curl "http://localhost:3001/approvals/<approvalId>"
 ```
 
-`X402_PAYMENT` screens `target` with the Intercepta quick scan before execution. Set `INTERCEPTA_API_KEY`. A missing key refuses the payment. Swaps do not call Intercepta.
+`X402_PAYMENT` takes the resource URL as `target`. The API gets the 402 quote, and the amount must match it exactly. Intercepta screens the quote's `payTo` before anything is signed. Set `INTERCEPTA_API_KEY`. A missing key refuses the payment. Swaps do not call Intercepta.
 
-`GET /x402/resource` returns 402 with the Sepolia USDC requirements. Pay that quote with an action. Amount `0.01` is under the autonomous limit, so a clear payee is settled immediately. `EXECUTOR_PRIVATE_KEY` must hold Sepolia ETH for gas and Circle USDC for the transfer.
+`GET /x402/resource` is the demo seller. Without a `PAYMENT-SIGNATURE` header it returns 402 with the Sepolia USDC quote in the body and the `PAYMENT-REQUIRED` header. With one, it calls the facilitator at `FACILITATOR_URL` (default `http://localhost:$PORT/facilitator`) to verify and settle, then returns 200 with `PAYMENT-RESPONSE`. `0.01` is under the autonomous limit, so a clear payee is paid immediately. `EXECUTOR_PRIVATE_KEY` signs and must hold Circle USDC. The facilitator key (`FACILITATOR_PRIVATE_KEY`, else `EXECUTOR_PRIVATE_KEY`) pays Sepolia gas. The facilitator settles only to `X402_PAY_TO`.
 
 ```sh
 curl -sS -D - "http://localhost:3001/x402/resource"
-# after a signed settlement
-curl -sS "http://localhost:3001/x402/resource?tx=<txHash>"
+curl -sS "http://localhost:3001/facilitator/supported"
 curl -X POST "http://localhost:3001/agents/<agentId>/actions" \
   -H "content-type: application/json" \
-  -d '{"action":"X402_PAYMENT","target":"<payTo from the 402>","amount":"0.01"}'
+  -d '{"action":"X402_PAYMENT","target":"http://localhost:3001/x402/resource","amount":"0.01"}'
 ```
 
 Env, all optional:

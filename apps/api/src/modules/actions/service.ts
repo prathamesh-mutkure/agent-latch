@@ -7,15 +7,15 @@ import {
   USDC_SEPOLIA_ADDRESS,
   UsdcAmountError,
 } from "@agentlatch/core";
-import {
-  InterceptaError,
-  type PaymentScreen,
-  screenPayment,
-} from "@agentlatch/intercepta";
 import { and, asc, eq, gte } from "drizzle-orm";
 import { db } from "../../db/client";
 import { saveExecution } from "../../executor";
-import { settleAuthorizedPayment } from "../../payments";
+import {
+  payQuote,
+  type Quote,
+  quoteResource,
+  screenPayee,
+} from "../../payments";
 import type { Failure, Success } from "../../result";
 import { loadPolicyTexts } from "../agents/ens";
 import { readPassportGate } from "../agents/passport";
@@ -121,8 +121,18 @@ export async function submitAction(input: {
         };
   }
 
+  let quote: Quote | undefined;
   if (input.action === "X402_PAYMENT" && decision.decision !== "BLOCK") {
-    const screened = await screenPayee(target);
+    const quoted = await quoteResource({
+      target,
+      token,
+      amount: amount.toString(),
+    });
+    if (!quoted.ok) {
+      return quoted;
+    }
+    quote = quoted.value;
+    const screened = await screenPayee(quote.requirement.payTo);
     if (!screened.ok) {
       return screened;
     }
@@ -135,12 +145,8 @@ export async function submitAction(input: {
   }
 
   let signed = false;
-  if (input.action === "X402_PAYMENT" && decision.decision === "ALLOW") {
-    const settled = await settleAuthorizedPayment({
-      target,
-      token,
-      amount: amount.toString(),
-    });
+  if (quote && decision.decision === "ALLOW") {
+    const settled = await payQuote(quote);
     if (!settled.ok) {
       return settled;
     }
@@ -230,40 +236,6 @@ export async function submitAction(input: {
     });
   }
   return { ok: true, value: action };
-}
-
-function isPayee(value: string): boolean {
-  return (
-    /^0x[0-9a-fA-F]{40}$/.test(value) ||
-    /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(value)
-  );
-}
-
-async function screenPayee(
-  payTo: string,
-): Promise<Success<PaymentScreen> | Failure> {
-  if (!isPayee(payTo)) {
-    return {
-      ok: false,
-      status: 400,
-      error: "Payment target must be an Ethereum address or ENS name.",
-    };
-  }
-  try {
-    return {
-      ok: true,
-      value: await screenPayment({
-        payTo,
-        apiKey: process.env.INTERCEPTA_API_KEY ?? "",
-      }),
-    };
-  } catch (error) {
-    const message =
-      error instanceof InterceptaError
-        ? error.message
-        : "Intercepta screening failed.";
-    return { ok: false, status: 400, error: message };
-  }
 }
 
 async function spentToday(agentId: string, now: Date): Promise<bigint> {

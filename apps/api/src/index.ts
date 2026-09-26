@@ -7,6 +7,7 @@ import { agentsRoutes } from "./modules/agents/routes";
 import { approvalRoutes } from "./modules/approvals/routes";
 import { resumeWorldIdChecks } from "./modules/approvals/service";
 import { auditRoutes } from "./modules/audit/routes";
+import { facilitatorRoutes } from "./modules/facilitator/routes";
 import { healthRoutes } from "./modules/health/routes";
 import { worldRoutes } from "./modules/world/routes";
 import { x402Routes } from "./modules/x402/routes";
@@ -19,7 +20,8 @@ export const app = new Elysia()
   .use(actionRoutes)
   .use(approvalRoutes)
   .use(auditRoutes)
-  .use(x402Routes);
+  .use(x402Routes)
+  .use(facilitatorRoutes);
 
 export type App = typeof app;
 
