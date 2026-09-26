@@ -93,6 +93,14 @@ Supersedes the name-resolution sentence in "ENSv2".
 - ENSjs (`@ensdomains/ensjs`) resolves the full name with `getOwner` and `getAddressRecord` on Sepolia whenever the parent namespace is known.
 - Registry status, EAC roles, parent namespace, and `register` stay direct Permissioned Registry calls. `ens.name` is set when ENSjs returns an owner or the registry status is `REGISTERED`.
 
+## 2026-09-26 — ENS subnames
+
+Supersedes the `POST /agents/:id/ens` sentence in "ENSv2".
+
+- Parent name defaults to `agent-latch.eth` (`ENS_PARENT_NAME`). Owner for the demo signer is `0x142B99367b928608835501633534411EFc467737`.
+- Registration deploys a UserRegistry through the Sepolia Verifiable Factory when `getSubregistry` is empty, then `setSubregistry`, `setParent`, and `register`.
+- The signer is `EXECUTOR_PRIVATE_KEY` and must be the parent owner. Sepolia ETH pays gas.
+
 ## How to change a decision
 
 Add a new dated section that names what it supersedes. Leave the old section in place and mark it superseded.

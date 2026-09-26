@@ -1,21 +1,27 @@
 import {
   type EnsIdentity,
-  registerEnsSubname,
-  resolveEnsIdentity,
+  readUnderParent,
+  registerUnderParent,
   sepoliaEns,
 } from "@agentlatch/ens";
 
 export type AgentEns = EnsIdentity;
 
-function ensOptions() {
-  return {
-    rpcUrl: process.env.SEPOLIA_RPC_URL ?? sepoliaEns.defaultRpcUrl,
-    registryAddress: process.env.ENS_REGISTRY_ADDRESS,
-  };
+function rpcUrl() {
+  return process.env.SEPOLIA_RPC_URL ?? sepoliaEns.defaultRpcUrl;
+}
+
+function parentName() {
+  return process.env.ENS_PARENT_NAME ?? sepoliaEns.defaultParentName;
 }
 
 export function readAgentEns(label: string): Promise<AgentEns> {
-  return resolveEnsIdentity(label, ensOptions());
+  return readUnderParent(
+    label,
+    parentName(),
+    rpcUrl(),
+    process.env.ENS_REGISTRY_ADDRESS ?? sepoliaEns.ethRegistry,
+  );
 }
 
 export function registerAgentEns(
@@ -28,10 +34,12 @@ export function registerAgentEns(
       "EXECUTOR_PRIVATE_KEY is required to register an ENS name.",
     );
   }
-  return registerEnsSubname({
+  return registerUnderParent({
+    parentName: parentName(),
     label,
     owner,
     privateKey: privateKey as `0x${string}`,
-    ...ensOptions(),
+    rpcUrl: rpcUrl(),
+    parentRegistry: process.env.ENS_REGISTRY_ADDRESS ?? sepoliaEns.ethRegistry,
   });
 }

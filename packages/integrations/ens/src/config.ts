@@ -10,7 +10,10 @@ export const sepoliaEns = {
   rootRegistry: "0x9703dbd26dab89504490994138cf2c575251a9ce",
   ethRegistrar: "0xabe76f6c8dfced81aa5a2bb8034202a7136b94ca",
   universalResolver: "0x5d25c1d6acbb71b7a28aa7899618a3412a8303e3",
+  verifiableFactory: "0x9e726eb570beb6bceb495ab8cda7df517d4e841c",
+  userRegistryImpl: "0xa80338aaa8d23831cea25e858d1774534abb0263",
   defaultRpcUrl: "https://ethereum-sepolia-rpc.publicnode.com",
+  defaultParentName: "agent-latch.eth",
 } as const;
 
 export const permissionedRegistryAbi = [
@@ -56,6 +59,33 @@ export const permissionedRegistryAbi = [
   },
   {
     type: "function",
+    name: "getSubregistry",
+    stateMutability: "view",
+    inputs: [{ name: "label", type: "string" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "setSubregistry",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "anyId", type: "uint256" },
+      { name: "registry", type: "address" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "setParent",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "parent", type: "address" },
+      { name: "label", type: "string" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
     name: "register",
     stateMutability: "nonpayable",
     inputs: [
@@ -88,3 +118,50 @@ export const registrationRoleBitmap =
 
 export const zeroAddress =
   "0x0000000000000000000000000000000000000000" as const;
+
+/** Every regular role and its admin role. Used to initialize a UserRegistry. */
+export const allRegistryRoles =
+  0x1111111111111111111111111111111111111111111111111111111111111111n;
+
+export const verifiableFactoryAbi = [
+  {
+    type: "function",
+    name: "deployProxy",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "implementation", type: "address" },
+      { name: "salt", type: "uint256" },
+      { name: "data", type: "bytes" },
+    ],
+    outputs: [{ name: "proxy", type: "address" }],
+  },
+  {
+    type: "event",
+    name: "ProxyDeployed",
+    inputs: [
+      { name: "sender", type: "address", indexed: true },
+      { name: "proxyAddress", type: "address", indexed: true },
+      { name: "salt", type: "uint256", indexed: false },
+      { name: "implementation", type: "address", indexed: false },
+    ],
+  },
+] as const;
+
+export const userRegistryInitAbi = [
+  {
+    type: "function",
+    name: "initialize",
+    stateMutability: "nonpayable",
+    inputs: [
+      {
+        name: "grants",
+        type: "tuple[]",
+        components: [
+          { name: "account", type: "address" },
+          { name: "roleBitmap", type: "uint256" },
+        ],
+      },
+    ],
+    outputs: [],
+  },
+] as const;

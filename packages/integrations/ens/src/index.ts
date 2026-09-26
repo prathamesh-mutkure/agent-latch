@@ -12,4 +12,5 @@ export {
   registerEnsSubname,
   resolveEnsIdentity,
 } from "./identity";
+export { readUnderParent, registerUnderParent } from "./namespace";
 export { resolveNameWithSdk } from "./sdk";

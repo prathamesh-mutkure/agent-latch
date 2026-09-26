@@ -40,7 +40,7 @@ It reuses an agent named `trader`, sets the 500/5000 USDC policy, and cycles thr
 curl -X POST "http://localhost:3001/agents/<agentId>/ens"
 ```
 
-That requires `EXECUTOR_PRIVATE_KEY` and a registry where that key can register names. The default registry is the Sepolia ETHRegistry.
+That requires `EXECUTOR_PRIVATE_KEY` for the owner of `ENS_PARENT_NAME` (default `agent-latch.eth`) and Sepolia ETH for gas. The route deploys a UserRegistry if the parent has none, links it with `setSubregistry` and `setParent`, then registers the agent label.
 
 ```sh
 # while it is waiting on the 2500 USDC swap
