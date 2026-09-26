@@ -8,7 +8,7 @@ import {
   USDC_SEPOLIA_ADDRESS,
   UsdcAmountError,
 } from "@agentlatch/core";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "../../db/client";
 import type { Failure, Success } from "../../result";
 import { recordAudit } from "../audit/service";
@@ -22,37 +22,67 @@ import {
 import { policyChange, policyFromTexts } from "./published";
 import { agents, policies } from "./schema";
 
-/** New agents start unowned. The owner claims one from World App. */
-export async function createAgent(name: string): Promise<Agent> {
+function isUniqueViolation(error: unknown): boolean {
+  let current = error;
+  while (current instanceof Error) {
+    if ("code" in current && current.code === "23505") {
+      return true;
+    }
+    current = current.cause;
+  }
+  return false;
+}
+
+/** An agent belongs to the owner who created it from the start. */
+export async function createAgent(
+  name: string,
+  userId: string,
+): Promise<Success<Agent> | Failure> {
   const agent: Agent = {
     id: crypto.randomUUID(),
-    name: name.trim(),
-    userId: null,
+    name,
+    userId,
     createdAt: new Date().toISOString(),
   };
   const createdAt = new Date(agent.createdAt);
-  await db.transaction(async (tx) => {
-    await tx.insert(agents).values({
-      id: agent.id,
-      name: agent.name,
-      userId: null,
-      createdAt,
+  try {
+    await db.transaction(async (tx) => {
+      await tx.insert(agents).values({
+        id: agent.id,
+        name: agent.name,
+        userId,
+        createdAt,
+      });
+      await recordAudit(tx, {
+        agentId: agent.id,
+        kind: "AGENT_CREATED",
+        summary: `Created agent ${agent.name}.`,
+        createdAt,
+      });
     });
-    await recordAudit(tx, {
-      agentId: agent.id,
-      kind: "AGENT_CREATED",
-      summary: `Created agent ${agent.name}.`,
-      createdAt,
-    });
-  });
-  return agent;
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return {
+        ok: false,
+        status: 409,
+        error: `The name ${name} is taken. Pick another.`,
+      };
+    }
+    throw error;
+  }
+  return { ok: true, value: agent };
 }
 
-export async function listAgents(): Promise<Agent[]> {
-  const rows = await db.select().from(agents).orderBy(agents.createdAt);
+export async function listAgents(userId: string): Promise<Agent[]> {
+  const rows = await db
+    .select()
+    .from(agents)
+    .where(eq(agents.userId, userId))
+    .orderBy(agents.createdAt);
   return rows.map(toAgent);
 }
 
+/** Any agent, for the agent-facing and settle paths. Owner routes use `getOwnedAgent`. */
 export async function getAgent(agentId: string): Promise<Agent | undefined> {
   const rows = await db
     .select()
@@ -63,40 +93,18 @@ export async function getAgent(agentId: string): Promise<Agent | undefined> {
   return row ? toAgent(row) : undefined;
 }
 
-/** Gives an unowned agent to the World App owner who signed the claim. */
-export async function claimAgent(
+/** Another owner's agent reads as missing. */
+export async function getOwnedAgent(
   agentId: string,
   userId: string,
-): Promise<Success<Agent> | Failure> {
-  return db.transaction(async (tx) => {
-    const rows = await tx
-      .select()
-      .from(agents)
-      .where(eq(agents.id, agentId))
-      .limit(1)
-      .for("update");
-    const row = rows[0];
-    if (!row) {
-      return { ok: false, status: 404, error: "Agent not found." };
-    }
-    if (row.userId === userId) {
-      return { ok: true, value: toAgent(row) };
-    }
-    if (row.userId) {
-      return { ok: false, status: 409, error: "Agent has another owner." };
-    }
-    const claimed = await tx
-      .update(agents)
-      .set({ userId })
-      .where(and(eq(agents.id, agentId), isNull(agents.userId)))
-      .returning();
-    await recordAudit(tx, {
-      agentId,
-      kind: "AGENT_CLAIMED",
-      summary: `Agent ${row.name} claimed in World App.`,
-    });
-    return { ok: true, value: toAgent(claimed[0] ?? row) };
-  });
+): Promise<Agent | undefined> {
+  const rows = await db
+    .select()
+    .from(agents)
+    .where(and(eq(agents.id, agentId), eq(agents.userId, userId)))
+    .limit(1);
+  const row = rows[0];
+  return row ? toAgent(row) : undefined;
 }
 
 export async function getPolicy(agentId: string): Promise<Policy | undefined> {
@@ -111,6 +119,7 @@ export async function getPolicy(agentId: string): Promise<Policy | undefined> {
 
 export async function setPolicy(
   agentId: string,
+  userId: string,
   input: {
     autonomousLimit: string;
     hardLimit: string;
@@ -119,7 +128,7 @@ export async function setPolicy(
     allowedTargets?: string[];
   },
 ): Promise<Success<Policy> | Failure> {
-  const agent = await getAgent(agentId);
+  const agent = await getOwnedAgent(agentId, userId);
   if (!agent) {
     return { ok: false, status: 404, error: "Agent not found." };
   }

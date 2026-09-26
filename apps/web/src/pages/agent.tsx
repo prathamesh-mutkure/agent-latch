@@ -17,6 +17,7 @@ import {
   roleLabel,
   spentToday,
 } from "../model";
+import { useSession } from "../session";
 import {
   ApprovalActions,
   Empty,
@@ -27,10 +28,10 @@ import {
   QueryGate,
   Stat,
 } from "../ui";
-import { OwnerLine } from "./agents";
 
 export function AgentPage() {
   const { agentId } = useParams({ from: "/agents/$agentId" });
+  const session = useSession();
   const agents = useAgents();
   const actions = useActions(agentId);
   const policy = usePolicy(agentId);
@@ -155,7 +156,7 @@ export function AgentPage() {
                 <Field label="ENS owner" value={agent.ens.owner ?? "Unknown"} />
                 <Field
                   label="Owner"
-                  value={agent.userId ? "World App wallet" : "Unclaimed"}
+                  value={`You, World App wallet ${session?.wallet ?? ""}`}
                 />
                 <Field label="Registry" value={agent.ens.registry} />
                 <Field
@@ -172,7 +173,6 @@ export function AgentPage() {
               {agent.ens.detail ? (
                 <p className="mt-3 text-sm text-muted">{agent.ens.detail}</p>
               ) : null}
-              <OwnerLine claimed={Boolean(agent.userId)} />
               <h3 className="mt-5 text-sm font-medium tracking-wide text-muted">
                 Permissions
               </h3>

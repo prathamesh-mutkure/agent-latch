@@ -34,9 +34,7 @@ export async function notifyApproval(input: {
       .limit(1);
     const owner = rows[0];
     if (!owner) {
-      console.log(
-        `world push skipped: agent ${input.agentId} is not claimed in World App`,
-      );
+      console.log(`world push skipped: agent ${input.agentId} has no owner`);
       return;
     }
     const result = await sendNotification({

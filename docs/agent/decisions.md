@@ -208,7 +208,7 @@ Supersedes the server-started ceremony in "World step-up does not auto-approve".
 
 ## 2026-09-27 — World App is the only human surface
 
-Partly superseded by "World ID for Agents confirms every approve" (2026-09-27): the one-product rule, the approve path, and the tradeoff. Claim, link, pushes, the challenge, and deny stand.
+Partly superseded by "World ID for Agents confirms every approve" (2026-09-27): the one-product rule, the approve path, and the tradeoff. Pushes, the challenge, and deny stand. Also partly superseded by "Owner accounts" (2026-09-27): no sessions, link and claim, the open approval list, and the desktop dashboard reading everything.
 
 Supersedes "World ID for Agents", "Deny needs World ID too", "World App notifications", "World step-up does not auto-approve", and "Step-up uses the signed-in human".
 
@@ -255,13 +255,28 @@ Supersedes the self-settled payment and the `?tx=` receipt check on `GET /x402/r
 
 ## 2026-09-27 — MCP server for x402 payments
 
-Supersedes "MCP server and SDK packages" in the cut column of `planning-v2.md`. The SDK package stays cut.
+Supersedes "MCP server and SDK packages" in the cut column of `planning-v2.md`. The SDK package stays cut. The name lookup is superseded by "Owner accounts" below.
 
 - Why: Ankit asked for AI agents (Claude, Cursor) to find AgentLatch's x402 sellers and pay them through the gate.
 - `apps/mcp` is a stdio MCP server. It is a client of the API, not a signer. It holds no key and never builds a `PAYMENT-SIGNATURE`. A payment is an `X402_PAYMENT` action, so the order stays policy, then Intercepta, then signing, and a payment above the autonomous limit waits for World approval.
 - Tools: `list_merchants`, `quote_resource`, `pay_resource`, `get_payment`, `list_payments`. `pay_resource` takes the agent's `maxAmountUsdc`, quotes the URL, and submits the quoted price only when it is at or below that maximum.
 - The merchant registry is `GET /x402/merchants` on the API. For now it lists AgentLatch's own demo seller, the only payee its facilitator settles for. No Bazaar discovery.
 - The agent is picked by `AGENTLATCH_AGENT_ID` or `AGENT_NAME`. The API has no agent keys yet, so anyone who can reach the API can submit as any agent. The pasted-key login in `planning-v2.md` future work is still open.
+
+## 2026-09-27 — Owner accounts
+
+Supersedes, in "World App is the only human surface": "no sessions", the link and claim bullet, and the open approval list. Step 1 of the multi-user plan in `continuation.md`.
+
+- Why: every visitor saw every agent, and the first wallet to claim an agent became its only approver. Each owner now signs up, owns the agents they create, and sees only those.
+- The account is still the World App wallet (`users.world_wallet`). No new identity, no OIDC, no cookie.
+- Sign-in inside World App: `GET /world/nonce`, one `MiniKit.walletAuth` (request ID `link`), then `POST /world/sign-in`. The first sign-in creates the user. It replaces `POST /world/link`. `agentId` and claiming are gone.
+- Session: a bearer token, `base64url(claims).HMAC-SHA256` over user ID, wallet, and expiry, signed with `SESSION_SECRET` (API only). Lasts 24 hours. The browser keeps it in local storage and sends `Authorization: Bearer`. There is no server-side revocation. Signing out drops the token. Without `SESSION_SECRET` the API makes a random secret per process, so sign-ins end on restart.
+- Desktop sign-in by QR: `POST /world/pair` returns an 8-character code and a 32-byte secret. The QR opens `/pair/<code>` in World App. `GET /world/pair/:code` returns the challenge (request ID `pair-<code>`, a statement naming the code). The phone signs it and posts to `POST /world/pair/:code`, which signs the phone in too. The computer polls `POST /world/pair/:code/session` with the secret and gets its session once. Codes live in API memory for 5 minutes and work once. Only the computer holds the secret, so seeing the QR is not enough to take the session.
+- Owner only, 401 without a session, 404 for another owner's agent: `GET /agents`, `GET /agents/:id`, `POST /agents`, policy read and write, `POST /agents/:id/ens`, `GET /agents/:id/audit`, `GET /approvals`, and `GET /me` (replaces `GET /world/owner/:wallet`).
+- Still open, because `apps/mcp` submits and reads payments with no owner session: `POST /agents/:id/actions`, `GET /agents/:id/actions`, `GET /actions/:id`, and `GET /approvals/:id`. The MCP server pays as `AGENTLATCH_AGENT_ID`, else `AGENT_ID`. It does not look agents up by name. That supersedes the name lookup in "MCP server for x402 payments". Agent keys close these routes later. The challenge and `decide` stay signature-gated, not session-gated.
+- `POST /agents` creates the agent owned by the caller. The name is the ENS label: 3 to 32 lower-case letters, digits, and dashes, unique ignoring case (migration 0005). A taken name is 409.
+- The background agent acts for `AGENT_ID` and never lists or creates agents. Without it the process idles.
+- `pilot` was already owned by `0xe5f5617c6996cd0f1b6afe02856f23f46296ad5c`, so no owner moved.
 
 ## How to change a decision
 

@@ -21,9 +21,7 @@ export function AgentsPage() {
         hasData={Boolean(agents.data)}
       >
         {agents.data?.length === 0 ? (
-          <Empty>
-            No agents yet. The background agent creates trader when it starts.
-          </Empty>
+          <Empty>You have no agents yet.</Empty>
         ) : (
           <ul className="grid gap-3">
             {agents.data?.map((agent) => {
@@ -54,7 +52,6 @@ export function AgentsPage() {
                         : "No roles granted"}
                     </p>
                   </Link>
-                  <OwnerLine claimed={Boolean(agent.userId)} />
                 </li>
               );
             })}
@@ -62,24 +59,5 @@ export function AgentsPage() {
         )}
       </QueryGate>
     </>
-  );
-}
-
-export function OwnerLine({ claimed }: { claimed: boolean }) {
-  if (claimed) {
-    return (
-      <p className="mt-2 text-xs text-muted">
-        Claimed in World App. Approvals push to its owner.
-      </p>
-    );
-  }
-  return (
-    <p className="mt-2 text-xs text-muted">
-      Unclaimed.{" "}
-      <Link to="/mini" className="underline">
-        Claim it in World App
-      </Link>{" "}
-      so approvals reach you.
-    </p>
   );
 }

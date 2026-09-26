@@ -2,6 +2,7 @@ import {
   type AgentLatchClient,
   createAgentLatchClient,
 } from "@agentlatch/api-client";
+import { clearSession, currentSession } from "./session";
 import type { SignedWalletAuth } from "./world";
 
 // Same origin as the page. Vite in dev, and Vercel in production, proxy /api
@@ -11,7 +12,12 @@ const tunnelHeaders = { "ngrok-skip-browser-warning": "1" };
 
 export const client: AgentLatchClient = createAgentLatchClient(
   `${window.location.origin}/api`,
-  tunnelHeaders,
+  () => {
+    const session = currentSession();
+    return session
+      ? { ...tunnelHeaders, authorization: `Bearer ${session.token}` }
+      : tunnelHeaders;
+  },
 );
 
 type CallResult<T> = {
@@ -35,6 +41,9 @@ function failureMessage(value: unknown): string {
 
 async function read<T>(pending: Promise<CallResult<T>>): Promise<T> {
   const result = await pending;
+  if (result.status === 401) {
+    clearSession();
+  }
   if (result.error || result.status >= 400) {
     throw new Error(failureMessage(result.error?.value));
   }
@@ -124,21 +133,60 @@ export async function worldNonce(): Promise<string> {
   return data.nonce;
 }
 
-/** Links the World App wallet that signed. With `agentId`, also claims that agent. */
-export async function linkWorldApp(body: {
+/** Signs in with the World App wallet that signed. The first sign-in creates the account. */
+export async function worldSignIn(body: {
   nonce: string;
-  agentId?: string;
   payload: SignedWalletAuth;
 }) {
-  const data = await read(client.world.link.post(body));
+  const data = await read(client.world["sign-in"].post(body));
   if (isErrorBody(data)) {
     throw new Error(data.error);
   }
   return data;
 }
 
-export function getOwner(wallet: string) {
-  return read(client.world.owner({ wallet }).get());
+/** The signed-in owner's agents and pending approvals. */
+export async function getAccount() {
+  const data = await read(client.me.get());
+  if (isErrorBody(data)) {
+    throw new Error(data.error);
+  }
+  return data;
+}
+
+/** Desktop sign-in: a code for the QR, and the secret only this browser keeps. */
+export function startPairing() {
+  return read(client.world.pair.post());
+}
+
+/** Polled by the computer until World App signs its code. */
+export async function collectPairing(code: string, secret: string) {
+  const data = await read(client.world.pair({ code }).session.post({ secret }));
+  if (isErrorBody(data)) {
+    throw new Error(data.error);
+  }
+  return data;
+}
+
+/** What World App signs to sign the computer in. */
+export async function getPairingChallenge(code: string) {
+  const data = await read(client.world.pair({ code }).get());
+  if (isErrorBody(data)) {
+    throw new Error(data.error);
+  }
+  return data;
+}
+
+/** World App signed the code. Signs this phone in too. */
+export async function confirmPairing(
+  code: string,
+  body: { nonce: string; payload: SignedWalletAuth },
+) {
+  const data = await read(client.world.pair({ code }).post(body));
+  if (isErrorBody(data)) {
+    throw new Error(data.error);
+  }
+  return data;
 }
 
 /** What World App must sign to approve or deny this one approval. */

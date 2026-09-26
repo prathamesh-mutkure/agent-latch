@@ -9,6 +9,7 @@ import { resumeWorldIdChecks } from "./modules/approvals/service";
 import { auditRoutes } from "./modules/audit/routes";
 import { facilitatorRoutes } from "./modules/facilitator/routes";
 import { healthRoutes } from "./modules/health/routes";
+import { usersRoutes } from "./modules/users/routes";
 import { worldRoutes } from "./modules/world/routes";
 import { x402Routes } from "./modules/x402/routes";
 
@@ -16,6 +17,7 @@ export const app = new Elysia()
   .use(cors())
   .use(healthRoutes)
   .use(worldRoutes)
+  .use(usersRoutes)
   .use(agentsRoutes)
   .use(actionRoutes)
   .use(approvalRoutes)

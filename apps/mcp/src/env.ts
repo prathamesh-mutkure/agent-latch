@@ -18,6 +18,10 @@ if (existsSync(rootEnv)) {
 }
 
 export const apiUrl = process.env.API_URL ?? "http://localhost:3001";
-/** The agent this server pays as. An id wins over a name. */
-export const agentId = process.env.AGENTLATCH_AGENT_ID;
-export const agentName = process.env.AGENT_NAME ?? "trader";
+/**
+ * The agent this server pays as. `AGENTLATCH_AGENT_ID` wins, then `AGENT_ID`
+ * (the same id the background agent uses). Names are not looked up: listing
+ * agents requires the owner's session.
+ */
+export const agentId =
+  process.env.AGENTLATCH_AGENT_ID || process.env.AGENT_ID || undefined;

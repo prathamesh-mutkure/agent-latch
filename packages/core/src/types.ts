@@ -28,7 +28,7 @@ export type ApprovalStatus =
 export type Agent = {
   id: string;
   name: string;
-  /** Owner who approves this agent's exceptional actions. Null until claimed. */
+  /** Owner who approves this agent's exceptional actions. Null only for agents made before owner accounts. */
   userId: string | null;
   createdAt: string;
 };

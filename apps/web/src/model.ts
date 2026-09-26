@@ -53,6 +53,15 @@ export function formatExpiry(iso: string, now = Date.now()): string {
   return `Expires in ${minutes} minutes`;
 }
 
+export function shortWallet(wallet: string): string {
+  return `${wallet.slice(0, 6)}…${wallet.slice(-4)}`;
+}
+
+/** Pairing codes read as `ABCD-EFGH` on both screens. */
+export function formatPairingCode(code: string): string {
+  return `${code.slice(0, 4)}-${code.slice(4)}`;
+}
+
 export function roleLabel(role: string): string {
   return role
     .replace(/^ROLE_/, "")

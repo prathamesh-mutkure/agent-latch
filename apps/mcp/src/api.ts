@@ -1,4 +1,4 @@
-import { agentId, agentName, apiUrl } from "./env";
+import { agentId, apiUrl } from "./env";
 
 export type Merchant = {
   id: string;
@@ -26,8 +26,6 @@ export type Action = {
   approvalRequestId: string | null;
   createdAt: string;
 };
-
-type AgentRecord = { id: string; name: string };
 
 export class ApiError extends Error {
   constructor(message: string) {
@@ -58,20 +56,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-let resolvedAgentId: string | undefined = agentId;
-
-/** The agent id, looked up once by name when no id is configured. */
-async function currentAgentId(): Promise<string> {
-  if (resolvedAgentId) {
-    return resolvedAgentId;
+function currentAgentId(): string {
+  if (!agentId) {
+    throw new ApiError(
+      "Set AGENTLATCH_AGENT_ID or AGENT_ID to the agent this server pays as.",
+    );
   }
-  const agents = await request<AgentRecord[]>("/agents");
-  const agent = agents.find((candidate) => candidate.name === agentName);
-  if (!agent) {
-    throw new ApiError(`No AgentLatch agent named ${agentName}.`);
-  }
-  resolvedAgentId = agent.id;
-  return agent.id;
+  return agentId;
 }
 
 export function listMerchants(): Promise<Merchant[]> {
@@ -83,7 +74,7 @@ export async function submitPayment(input: {
   amountUsdc: string;
   note?: string;
 }): Promise<Action> {
-  const id = await currentAgentId();
+  const id = currentAgentId();
   return request<Action>(`/agents/${id}/actions`, {
     method: "POST",
     body: JSON.stringify({
@@ -100,7 +91,7 @@ export function getAction(actionId: string): Promise<Action> {
 }
 
 export async function listPayments(): Promise<Action[]> {
-  const id = await currentAgentId();
+  const id = currentAgentId();
   const actions = await request<Action[]>(`/agents/${id}/actions`);
   return actions.filter((action) => action.action === "X402_PAYMENT");
 }

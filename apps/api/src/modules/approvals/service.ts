@@ -85,19 +85,24 @@ function bindingFields(row: {
   };
 }
 
-export async function listApprovals(): Promise<ApprovalRequest[]> {
+/** Every approval on one owner's agents, pending and settled. */
+export async function listApprovals(
+  userId: string,
+): Promise<ApprovalRequest[]> {
   const now = new Date();
   return db.transaction(async (tx) => {
     await expireDue(tx, now);
     const rows = await tx
-      .select()
+      .select({ approval: approvals })
       .from(approvals)
+      .innerJoin(agents, eq(approvals.agentId, agents.id))
+      .where(eq(agents.userId, userId))
       .orderBy(asc(approvals.createdAt));
-    return rows.map(toApproval);
+    return rows.map((row) => toApproval(row.approval));
   });
 }
 
-/** Pending approvals for one owner. The agent still polls the open list. */
+/** Pending approvals for one owner. The agent polls its own by ID. */
 export async function listOwnerApprovals(
   userId: string,
 ): Promise<ApprovalRequest[]> {
@@ -232,7 +237,7 @@ async function readPending(
     return {
       ok: false,
       status: 403,
-      error: "Claim this agent in World App first.",
+      error: "This agent has no owner, so nobody can decide for it.",
     };
   }
   return { ok: true, value: found };
@@ -475,7 +480,7 @@ type Decided = {
 
 /**
  * The owner signed Approve or Deny in World App. The signature must come from
- * the wallet that claimed the agent and cover this approval, this exact action,
+ * the wallet that owns the agent and cover this approval, this exact action,
  * and this decision. Deny closes the approval. Approve starts a World ID for
  * Agents device check and returns its link; the action runs only after World
  * ID verifies a fresh proof (see `settleWorldIdCheck`). The agent never

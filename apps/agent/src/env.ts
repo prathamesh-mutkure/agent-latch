@@ -18,6 +18,7 @@ if (existsSync(rootEnv)) {
 }
 
 export const apiUrl = process.env.API_URL ?? "http://localhost:3001";
-export const agentName = process.env.AGENT_NAME ?? "trader";
+/** The agent this process acts for. Its owner creates it in AgentLatch first. */
+export const agentId = process.env.AGENT_ID?.trim() || null;
 export const intervalMs = Number(process.env.AGENT_INTERVAL_MS ?? 10_000);
 export const pollMs = Number(process.env.AGENT_POLL_MS ?? 2_000);

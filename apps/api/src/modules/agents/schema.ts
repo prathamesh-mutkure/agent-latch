@@ -1,13 +1,25 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import {
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { users } from "../users/schema";
 
-export const agents = pgTable("agents", {
-  id: uuid("id").primaryKey(),
-  name: text("name").notNull(),
-  /** Owner who approves this agent's exceptional actions. Null until claimed. */
-  userId: uuid("user_id").references(() => users.id),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
-});
+export const agents = pgTable(
+  "agents",
+  {
+    id: uuid("id").primaryKey(),
+    /** ENS label under the parent name, so unique across every owner. */
+    name: text("name").notNull(),
+    /** Owner who approves this agent's exceptional actions. */
+    userId: uuid("user_id").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [uniqueIndex("agents_name_unique").on(sql`lower(${table.name})`)],
+);
 
 export const policies = pgTable("policies", {
   agentId: uuid("agent_id")

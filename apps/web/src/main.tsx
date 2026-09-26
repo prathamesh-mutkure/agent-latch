@@ -17,8 +17,10 @@ import { ApprovalsPage } from "./pages/approvals";
 import { ApprovePage } from "./pages/approve";
 import { MiniPage } from "./pages/mini";
 import { OverviewPage } from "./pages/overview";
+import { PairPage } from "./pages/pair";
 import { PaymentsPage } from "./pages/payments";
 import { PoliciesPage } from "./pages/policies";
+import { onSessionChange } from "./session";
 import { Shell } from "./shell";
 import { insideWorldApp, installWorldApp } from "./world";
 
@@ -87,6 +89,12 @@ const miniRoute = createRoute({
   component: MiniPage,
 });
 
+const pairRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/pair/$code",
+  component: PairPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   agentsRoute,
@@ -97,6 +105,7 @@ const routeTree = rootRoute.addChildren([
   approveRoute,
   paymentsRoute,
   miniRoute,
+  pairRoute,
 ]);
 
 const router = createRouter({
@@ -120,6 +129,11 @@ const queryClient = new QueryClient({
       retry: 1,
     },
   },
+});
+
+// Cached reads belong to one owner. Drop them when someone signs in or out.
+onSessionChange(() => {
+  void queryClient.resetQueries();
 });
 
 declare module "@tanstack/react-router" {

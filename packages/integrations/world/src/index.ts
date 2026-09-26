@@ -37,7 +37,7 @@ export function computeBindingHash(fields: BindingFields): string {
 /** What the owner chose in World App. */
 export type Decision = "approve" | "deny";
 
-/** Request ID signed when the owner links World App without claiming an agent. */
+/** Request ID signed to sign in inside World App. */
 export const LINK_REQUEST_ID = "link";
 
 /** Passed to `MiniKit.walletAuth` unchanged. The server rebuilds it to verify. */

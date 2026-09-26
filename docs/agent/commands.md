@@ -32,12 +32,13 @@ bun --filter @agentlatch/agent dev
 bun --filter @agentlatch/agent dev
 ```
 
-It reuses an agent named `trader`, sets the 500/5000 USDC policy, and cycles three mocked swaps: 100 USDC (allow), 2500 USDC (waits for approval), 10000 USDC (block). It does not approve itself.
+It acts for the agent in `AGENT_ID` and cycles three mocked swaps: 100 USDC (allow), 2500 USDC (waits for approval), 10000 USDC (block). It does not approve itself, list agents, create agents, or change policy. Without `AGENT_ID` it idles. Copy the ID from the agent's page in the dashboard.
 
-`GET /agents/:id` adds an `ens` object read from Sepolia ENSv2. Register the agent's label with:
+Owner routes need a session: `Authorization: Bearer <token>`. Sign in on the dashboard, then copy the token from local storage key `agentlatch.session` (field `token`). `GET /agents/:id` adds an `ens` object read from Sepolia ENSv2. Register the agent's label with:
 
 ```sh
-curl -X POST "http://localhost:3001/agents/<agentId>/ens"
+curl -X POST "http://localhost:3001/agents/<agentId>/ens" \
+  -H "authorization: Bearer <token>"
 ```
 
 That requires `EXECUTOR_PRIVATE_KEY` for the owner of `ENS_PARENT_NAME` (default `agent-latch.eth`) and Sepolia ETH for gas. The route deploys a UserRegistry if the parent has none, links it with `setSubregistry` and `setParent`, then registers the agent label.
@@ -65,14 +66,14 @@ Env, all optional:
 
 ```sh
 API_URL=http://localhost:3001
-AGENT_NAME=trader
+AGENT_ID=<agent id>
 AGENT_INTERVAL_MS=10000
 AGENT_POLL_MS=2000
 ```
 
 ## MCP server
 
-`apps/mcp` is a stdio MCP server for AI agents. It talks to the API at `API_URL` and pays as the agent `AGENTLATCH_AGENT_ID`, else the agent named `AGENT_NAME` (default `trader`). It holds no key. Every payment is an `X402_PAYMENT` action, so the ENS policy, Intercepta, and World approval apply.
+`apps/mcp` is a stdio MCP server for AI agents. It talks to the API at `API_URL` and pays as `AGENTLATCH_AGENT_ID`, else `AGENT_ID`. It holds no key. Every payment is an `X402_PAYMENT` action, so the ENS policy, Intercepta, and World approval apply. Listing agents needs an owner session, so the server does not look an agent up by name.
 
 Tools: `list_merchants` (`GET /x402/merchants`), `quote_resource` (reads the 402 quote, pays nothing), `pay_resource` (`url`, `maxAmountUsdc`, `note`; refuses a price above the maximum), `get_payment`, `list_payments`.
 
@@ -89,7 +90,7 @@ Cursor or Claude Desktop:
     "agentlatch": {
       "command": "bun",
       "args": ["/absolute/path/to/agent-latch/apps/mcp/src/index.ts"],
-      "env": { "API_URL": "http://localhost:3001", "AGENT_NAME": "trader" }
+      "env": { "API_URL": "http://localhost:3001", "AGENT_ID": "<agent id>" }
     }
   }
 }
@@ -122,7 +123,11 @@ ngrok http 3001
 # put the https host in apps/web/vercel.json, then redeploy apps/web
 ```
 
-Set the Developer Portal mini app URL to that web host. Set `WORLD_APP_ID` and `WORLD_NOTIFICATION_API_KEY` in `.env` for the API. `WORLDCHAIN_RPC_URL` is optional.
+Set the Developer Portal mini app URL to that web host. Set `WORLD_APP_ID`, `WORLD_NOTIFICATION_API_KEY`, and `SESSION_SECRET` in `.env` for the API. `WORLDCHAIN_RPC_URL` is optional. Generate the session secret once and keep it, or every API restart signs everyone out:
+
+```sh
+openssl rand -hex 32
+```
 
 World ID for Agents needs a confidential client from `https://sandbox.auth.world.org/portal`, registered with an HTTPS callback (device clients still need one) and `client_secret_basic`. Set these for the API only:
 
@@ -134,7 +139,7 @@ WORLD_CLIENT_SECRET=<from the portal, backend only>
 
 `GET /world/config` returns `worldIdReady: true` when all three are set.
 
-On the phone: open the mini app in World App, tap Claim on the agent, sign, and allow notifications. When the agent goes past its rules, the push opens `/approve/<id>`. Deny: tap Deny and sign. Approve: tap Approve with World ID and sign, then tap Open World ID, check the code, and tap Authenticate with World ID. The action runs once the API has validated World's token. Tapping Deny sign-in on World ID rejects the approval. The desktop dashboard shows the same approval with a "Decide in World App" link.
+On the phone: open the mini app in World App, tap Sign in with World App, sign, and allow notifications. The first sign-in creates the account. On the computer: open the dashboard, scan the QR code in World App, and tap Sign in. Each wallet sees only its own agents. When an agent goes past its rules, the push opens `/approve/<id>`. Deny: tap Deny and sign. Approve: tap Approve with World ID and sign, then tap Open World ID, check the code, and tap Authenticate with World ID. The action runs once the API has validated World's token. Tapping Deny sign-in on World ID rejects the approval. The desktop dashboard shows the same approval with a "Decide in World App" link.
 
 ## Checks
 

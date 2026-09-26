@@ -11,21 +11,10 @@ export const insideWorldApp = MiniKit.isInWorldApp();
 /** Must match `LINK_REQUEST_ID` in `@agentlatch/world`. */
 export const LINK_REQUEST_ID = "link";
 
-const WALLET_KEY = "agentlatch.worldWallet";
-
 export function installWorldApp() {
   if (insideWorldApp) {
     MiniKit.install();
   }
-}
-
-/** The World App wallet on this phone, from World App or the last sign-in. */
-export function currentWallet(): string | null {
-  const fromApp = insideWorldApp ? MiniKit.user?.walletAddress : undefined;
-  if (fromApp) {
-    return fromApp.toLowerCase();
-  }
-  return window.localStorage.getItem(WALLET_KEY);
 }
 
 export type SignedWalletAuth = {
@@ -54,7 +43,6 @@ export async function signInWorldApp(input: {
         : undefined,
     });
     const { address, message, signature } = result.data;
-    window.localStorage.setItem(WALLET_KEY, address.toLowerCase());
     return { address, message, signature };
   } catch (error) {
     if (error instanceof WalletAuthError && error.code === "user_rejected") {

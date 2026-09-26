@@ -6,7 +6,6 @@ import { formatDollars } from "../model";
 import {
   ApprovalActions,
   Field,
-  OpenInWorldApp,
   PageHeader,
   Panel,
   Pill,
@@ -89,7 +88,6 @@ export function ApprovePage() {
   const outcome = data ? outcomeOf(data) : null;
   const agent = agents.data?.find((item) => item.id === data?.agentId);
   const label = data ? `${data.action} ${formatDollars(data.amountUsdc)}` : "";
-  const unclaimed = Boolean(agent && !agent.userId);
 
   return (
     <>
@@ -155,25 +153,7 @@ export function ApprovePage() {
                 <Field label="Failure" value={data.failureReason} />
               ) : null}
             </dl>
-            {data.status === "PENDING" && unclaimed ? (
-              <div className="mt-4">
-                <p className="text-sm text-muted">
-                  Nobody owns this agent yet. Claim it in World App first, then
-                  come back to decide.
-                </p>
-                {insideWorldApp ? (
-                  <Link
-                    to="/mini"
-                    className="mt-3 inline-block rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper"
-                  >
-                    Claim in World App
-                  </Link>
-                ) : (
-                  <OpenInWorldApp path="/mini" label="Claim in World App" />
-                )}
-              </div>
-            ) : null}
-            {data.status === "PENDING" && !unclaimed ? (
+            {data.status === "PENDING" ? (
               <ApprovalActions
                 approvalId={data.id}
                 label={label}

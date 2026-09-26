@@ -5,6 +5,7 @@ import { actionIdParams, agentIdParams, submitActionBody } from "./schemas";
 import { getAction, listActions, submitAction } from "./service";
 
 export const actionRoutes = new Elysia()
+  // The agent and the MCP server use these. They stay open until agents authenticate with a key.
   .post(
     "/agents/:agentId/actions",
     async ({ params, body, set }) => {

@@ -27,6 +27,7 @@ import { notifyApproval } from "../notify/service";
 import { toAction } from "./dto";
 import { actions, executions } from "./schema";
 
+/** Open to the agent and the MCP server. Owner sessions do not gate it. */
 export async function listActions(
   agentId: string,
 ): Promise<Success<ActionRequest[]> | Failure> {
@@ -41,6 +42,7 @@ export async function listActions(
   return { ok: true, value: rows.map(toAction) };
 }
 
+/** Open to the agent and the MCP server. Owner sessions do not gate it. */
 export async function getAction(
   actionId: string,
 ): Promise<ActionRequest | undefined> {

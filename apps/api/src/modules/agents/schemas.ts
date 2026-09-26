@@ -5,8 +5,18 @@ export const agentIdParams = z.object({
   agentId: z.uuid(),
 });
 
+/** The name becomes `<name>.<parent>` on ENS. */
 export const createAgentBody = z.object({
-  name: z.string().trim().min(1).max(64),
+  name: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(3)
+    .max(32)
+    .regex(
+      /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/,
+      "Use lower-case letters, digits, and dashes, starting and ending with a letter or digit.",
+    ),
 });
 
 export const setPolicyBody = z.object({

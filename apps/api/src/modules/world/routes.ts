@@ -1,23 +1,46 @@
 import { Elysia } from "elysia";
 import { respond } from "../../result";
 import { worldIdSettings } from "../approvals/world-id";
-import { linkBody, walletParams } from "./schemas";
-import { getOwner, issueNonce, linkWorldApp } from "./service";
+import { collectPairingBody, pairingParams, signInBody } from "./schemas";
+import {
+  collectPairing,
+  confirmPairing,
+  issueNonce,
+  pairingChallenge,
+  signInWorldApp,
+  startPairing,
+} from "./service";
 
 export const worldRoutes = new Elysia({ prefix: "/world" })
+  .onBeforeHandle(({ set }) => {
+    set.headers["cache-control"] = "no-store";
+  })
   .get("/config", () => ({
     appId: process.env.WORLD_APP_ID?.trim() || null,
     worldIdReady: worldIdSettings() !== null,
   }))
-  .get("/nonce", ({ set }) => {
-    set.headers["cache-control"] = "no-store";
-    return { nonce: issueNonce() };
-  })
+  .get("/nonce", () => ({ nonce: issueNonce() }))
   .post(
-    "/link",
-    async ({ body, set }) => respond(set, await linkWorldApp(body)),
-    { body: linkBody },
+    "/sign-in",
+    async ({ body, set }) => respond(set, await signInWorldApp(body)),
+    { body: signInBody },
   )
-  .get("/owner/:wallet", async ({ params }) => getOwner(params.wallet), {
-    params: walletParams,
-  });
+  // Desktop sign-in: the computer shows a QR code, World App signs it.
+  .post("/pair", () => startPairing())
+  .get(
+    "/pair/:code",
+    ({ params, set }) => respond(set, pairingChallenge(params.code)),
+    { params: pairingParams },
+  )
+  .post(
+    "/pair/:code",
+    async ({ params, body, set }) =>
+      respond(set, await confirmPairing(params.code, body)),
+    { params: pairingParams, body: signInBody },
+  )
+  .post(
+    "/pair/:code/session",
+    ({ params, body, set }) =>
+      respond(set, collectPairing(params.code, body.secret)),
+    { params: pairingParams, body: collectPairingBody },
+  );

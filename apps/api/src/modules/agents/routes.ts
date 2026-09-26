@@ -1,11 +1,12 @@
 import { Elysia, t } from "elysia";
 import { respond } from "../../result";
+import { session } from "../../session";
 import { toPolicyDto } from "./dto";
 import { readAgentEns, recordsToPublish, registerAgentEns } from "./ens";
 import { agentIdParams, createAgentBody, setPolicyBody } from "./schemas";
 import {
   createAgent,
-  getAgent,
+  getOwnedAgent,
   getPolicy,
   listAgents,
   setPolicy,
@@ -15,31 +16,44 @@ async function agentWithEns<T extends { name: string }>(agent: T) {
   return { ...agent, ens: await readAgentEns(agent.name) };
 }
 
-// Claiming runs through POST /world/link with a World App signature.
+// Owner routes. Each one sees only the signed-in owner's agents.
 export const agentsRoutes = new Elysia({ prefix: "/agents" })
-  .post("/", async ({ body }) => agentWithEns(await createAgent(body.name)), {
-    body: createAgentBody,
-  })
-  .get("/", async () => {
-    const agents = await listAgents();
-    return Promise.all(agents.map((agent) => agentWithEns(agent)));
-  })
+  .use(session)
+  .post(
+    "/",
+    async ({ body, owner, set }) => {
+      const created = await createAgent(body.name, owner.userId);
+      if (!created.ok) {
+        return respond(set, created);
+      }
+      return agentWithEns(created.value);
+    },
+    { body: createAgentBody, signedIn: true },
+  )
+  .get(
+    "/",
+    async ({ owner }) => {
+      const agents = await listAgents(owner.userId);
+      return Promise.all(agents.map((agent) => agentWithEns(agent)));
+    },
+    { signedIn: true },
+  )
   .get(
     "/:agentId",
-    async ({ params, set }) => {
-      const agent = await getAgent(params.agentId);
+    async ({ params, owner, set }) => {
+      const agent = await getOwnedAgent(params.agentId, owner.userId);
       if (!agent) {
         set.status = 404;
         return { error: "Agent not found." };
       }
       return agentWithEns(agent);
     },
-    { params: agentIdParams },
+    { params: agentIdParams, signedIn: true },
   )
   .post(
     "/:agentId/ens",
-    async ({ params, body, set }) => {
-      const agent = await getAgent(params.agentId);
+    async ({ params, body, owner, set }) => {
+      const agent = await getOwnedAgent(params.agentId, owner.userId);
       if (!agent) {
         set.status = 404;
         return { error: "Agent not found." };
@@ -64,12 +78,13 @@ export const agentsRoutes = new Elysia({ prefix: "/agents" })
       body: t.Object({
         owner: t.Optional(t.String()),
       }),
+      signedIn: true,
     },
   )
   .put(
     "/:agentId/policy",
-    async ({ params, body, set }) => {
-      const result = await setPolicy(params.agentId, body);
+    async ({ params, body, owner, set }) => {
+      const result = await setPolicy(params.agentId, owner.userId, body);
       if (!result.ok) {
         return respond(set, result);
       }
@@ -78,12 +93,13 @@ export const agentsRoutes = new Elysia({ prefix: "/agents" })
     {
       params: agentIdParams,
       body: setPolicyBody,
+      signedIn: true,
     },
   )
   .get(
     "/:agentId/policy",
-    async ({ params, set }) => {
-      if (!(await getAgent(params.agentId))) {
+    async ({ params, owner, set }) => {
+      if (!(await getOwnedAgent(params.agentId, owner.userId))) {
         set.status = 404;
         return { error: "Agent not found." };
       }
@@ -94,5 +110,5 @@ export const agentsRoutes = new Elysia({ prefix: "/agents" })
       }
       return toPolicyDto(policy);
     },
-    { params: agentIdParams },
+    { params: agentIdParams, signedIn: true },
   );

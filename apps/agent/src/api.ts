@@ -1,10 +1,5 @@
 import { apiUrl } from "./env";
 
-export type AgentRecord = {
-  id: string;
-  name: string;
-};
-
 export type ActionResult = {
   id: string;
   decision: "ALLOW" | "BLOCK" | "HUMAN_APPROVAL";
@@ -47,27 +42,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function apiHealth(): Promise<Health> {
   return request<Health>("/health");
-}
-
-export function listAgents(): Promise<AgentRecord[]> {
-  return request<AgentRecord[]>("/agents");
-}
-
-export function createAgent(name: string): Promise<AgentRecord> {
-  return request<AgentRecord>("/agents", {
-    method: "POST",
-    body: JSON.stringify({ name }),
-  });
-}
-
-export function setDemoPolicy(agentId: string): Promise<unknown> {
-  return request(`/agents/${agentId}/policy`, {
-    method: "PUT",
-    body: JSON.stringify({
-      autonomousLimit: "500",
-      hardLimit: "5000",
-    }),
-  });
 }
 
 export function submitSwap(

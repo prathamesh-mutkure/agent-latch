@@ -82,9 +82,7 @@ export function OverviewPage() {
           />
         ) : null}
         {agents.data && agents.data.length === 0 ? (
-          <Empty>
-            No agents yet. The background agent creates trader when it starts.
-          </Empty>
+          <Empty>You have no agents yet.</Empty>
         ) : (
           <ul className="grid gap-4">
             {agents.data?.map((agent) => {

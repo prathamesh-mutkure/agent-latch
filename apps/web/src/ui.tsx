@@ -189,9 +189,9 @@ export function OpenInWorldApp({
 
 /**
  * Deny is one World App signature. Approve is a World App signature from the
- * wallet that claimed the agent, then a fresh World ID for Agents check that
- * the API validates before the action runs. Outside World App the page only
- * links there.
+ * wallet that owns the agent, then a fresh World ID for Agents check that the
+ * API validates before the action runs. Outside World App the page only links
+ * there.
  */
 export function ApprovalActions({
   approvalId,
@@ -212,7 +212,7 @@ export function ApprovalActions({
         detail={
           worldIdStatus === "WAITING"
             ? "The owner signed Approve and is finishing World ID."
-            : "The agent's owner approves or denies in World App. A claimed agent's owner gets a push."
+            : "The agent's owner approves or denies in World App, from the push or the approvals list."
         }
       />
     );

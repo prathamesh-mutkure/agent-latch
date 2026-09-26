@@ -1,13 +1,5 @@
-import {
-  type ApprovalResult,
-  apiHealth,
-  createAgent,
-  getApproval,
-  listAgents,
-  setDemoPolicy,
-  submitSwap,
-} from "./api";
-import { agentName, intervalMs, pollMs } from "./env";
+import { type ApprovalResult, apiHealth, getApproval, submitSwap } from "./api";
+import { agentId, intervalMs, pollMs } from "./env";
 import { nextTick } from "./market";
 
 function sleep(ms: number): Promise<void> {
@@ -29,19 +21,6 @@ async function waitForApi(): Promise<void> {
   }
 }
 
-async function ensureAgent(): Promise<string> {
-  const agents = await listAgents();
-  const existing = agents.find((agent) => agent.name === agentName);
-  if (existing) {
-    console.log(`agent ${existing.name} ${existing.id}`);
-    return existing.id;
-  }
-  const agent = await createAgent(agentName);
-  await setDemoPolicy(agent.id);
-  console.log(`agent ${agent.name} ${agent.id} policy 500/5000 USDC`);
-  return agent.id;
-}
-
 async function waitForDecision(approvalId: string): Promise<ApprovalResult> {
   for (;;) {
     const approval = await getApproval(approvalId);
@@ -54,8 +33,14 @@ async function waitForDecision(approvalId: string): Promise<ApprovalResult> {
 }
 
 async function run(): Promise<void> {
+  if (!agentId) {
+    console.log(
+      "agent idle: set AGENT_ID to the id of an agent you own (the /agents/<id> page in the dashboard)",
+    );
+    return;
+  }
   await waitForApi();
-  const agentId = await ensureAgent();
+  console.log(`agent ${agentId}`);
 
   for (;;) {
     const tick = nextTick();

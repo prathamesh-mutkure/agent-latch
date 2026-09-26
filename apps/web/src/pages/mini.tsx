@@ -1,12 +1,11 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { linkWorldApp, worldNonce } from "../api";
-import { useAgents, useOwner } from "../hooks";
+import { worldNonce, worldSignIn } from "../api";
+import { useAccount, useAgents } from "../hooks";
 import { formatDollars } from "../model";
+import { clearSession, saveSession, useSession } from "../session";
 import { Empty, OpenInWorldApp, PageHeader, Panel, Pill } from "../ui";
 import {
-  currentWallet,
   enableNotifications,
   insideWorldApp,
   LINK_REQUEST_ID,
@@ -26,12 +25,12 @@ function OutsideWorldApp() {
     <>
       <PageHeader
         title="World App"
-        detail="When an agent goes past its rules, AgentLatch pushes the approval to its owner in World App. The owner approves or denies there."
+        detail="When one of your agents goes past its rules, AgentLatch pushes the approval to you in World App. You approve or deny there."
       />
       <Panel>
         <p className="text-sm text-muted">
-          Open AgentLatch in World App to claim agents, turn on notifications,
-          and decide approvals.
+          Open AgentLatch in World App to turn on notifications and decide
+          approvals.
         </p>
         <OpenInWorldApp path="/mini" label="Open in World App" />
       </Panel>
@@ -40,11 +39,8 @@ function OutsideWorldApp() {
 }
 
 function WorldAppHome() {
-  const [wallet, setWallet] = useState(currentWallet);
-  const owner = useOwner(wallet);
-  const agents = useAgents();
-  const queryClient = useQueryClient();
-  const [busy, setBusy] = useState<string | null>(null);
+  const session = useSession();
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notifications, setNotifications] =
     useState<NotificationState>("unknown");
@@ -66,31 +62,24 @@ function WorldAppHome() {
     }
   }
 
-  /** One signature links this phone and, with an agent, claims it. */
-  async function link(agent?: { id: string; name: string }) {
+  /** One signature. The first sign-in creates the account. */
+  async function signIn() {
     setError(null);
-    setBusy(agent?.id ?? LINK_REQUEST_ID);
+    setBusy(true);
     try {
       const nonce = await worldNonce();
       const signed = await signInWorldApp({
         nonce,
-        statement: agent
-          ? `Claim agent ${agent.name} and send its approvals to this World App.`
-          : "Send AgentLatch approvals to this World App.",
-        requestId: agent?.id ?? LINK_REQUEST_ID,
+        statement:
+          "Sign in to AgentLatch. Approvals for your agents come to this World App.",
+        requestId: LINK_REQUEST_ID,
         expirationTime: new Date(Date.now() + SIGN_IN_TTL_MS).toISOString(),
       });
       if (!signed) {
         return;
       }
-      const view = await linkWorldApp({
-        nonce,
-        agentId: agent?.id,
-        payload: signed,
-      });
-      setWallet(view.wallet);
-      queryClient.setQueryData(["owner", view.wallet], view);
-      await queryClient.invalidateQueries({ queryKey: ["agents"] });
+      const result = await worldSignIn({ nonce, payload: signed });
+      saveSession(result.session);
       if (notifications !== "on") {
         await turnOnNotifications();
       }
@@ -99,15 +88,9 @@ function WorldAppHome() {
         caught instanceof Error ? caught.message : "World App sign-in failed.",
       );
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   }
-
-  const linked = owner.data?.linked === true;
-  const ownedIds = new Set(owner.data?.agentIds ?? []);
-  const mine = agents.data?.filter((agent) => ownedIds.has(agent.id)) ?? [];
-  const unclaimed = agents.data?.filter((agent) => !agent.userId) ?? [];
-  const pending = owner.data?.pending ?? [];
 
   return (
     <>
@@ -123,117 +106,125 @@ function WorldAppHome() {
           {error}
         </p>
       ) : null}
-      <div className="grid gap-4">
-        <Panel title="Waiting for you">
-          {!linked ? (
-            <Empty>Claim an agent below to get its approvals here.</Empty>
-          ) : pending.length ? (
-            <ul className="grid gap-3">
-              {pending.map((approval) => (
-                <li key={approval.id}>
-                  <Link
-                    to="/approve/$approvalId"
-                    params={{ approvalId: approval.id }}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-wait/40 bg-wait-soft px-4 py-3"
-                  >
-                    <span className="font-medium">
-                      {approval.action} {formatDollars(approval.amountUsdc)}
-                    </span>
-                    <Pill>{approval.status}</Pill>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <Empty>No approval is waiting.</Empty>
-          )}
-        </Panel>
-
-        <Panel title="Notifications">
-          {notifications === "on" ? (
-            <p className="text-sm text-muted">
-              On. Approvals push to this phone.
-            </p>
-          ) : notifications === "blocked" ? (
-            <p className="text-sm text-muted">
-              Off. Turn on notifications for AgentLatch in World App settings,
-              then reopen this page.
-            </p>
-          ) : (
-            <>
-              <p className="text-sm text-muted">
-                Turn on notifications so approvals reach you.
-              </p>
-              <button
-                type="button"
-                className="mt-3 rounded-md border border-ink px-4 py-2 text-sm font-medium"
-                onClick={() => void turnOnNotifications()}
-              >
-                Turn on notifications
-              </button>
-            </>
-          )}
-        </Panel>
-
-        {mine.length > 0 ? (
-          <Panel title="Your agents">
-            <ul className="grid gap-2">
-              {mine.map((agent) => (
-                <li key={agent.id} className="text-sm font-medium">
-                  {agent.ens.name ?? agent.name}
-                </li>
-              ))}
-            </ul>
-          </Panel>
-        ) : null}
-
-        {unclaimed.length > 0 ? (
-          <Panel title="Unclaimed agents">
-            <ul className="grid gap-3">
-              {unclaimed.map((agent) => {
-                const name = agent.ens.name ?? agent.name;
-                return (
-                  <li
-                    key={agent.id}
-                    className="flex items-center justify-between gap-3"
-                  >
-                    <span className="text-sm font-medium">{name}</span>
-                    <button
-                      type="button"
-                      className="rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-paper disabled:opacity-50"
-                      disabled={busy !== null}
-                      onClick={() => void link({ id: agent.id, name })}
-                    >
-                      {busy === agent.id ? "Signing…" : "Claim"}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </Panel>
-        ) : null}
-
-        <Panel title="This phone">
-          <p className="font-mono text-xs break-all text-muted">
-            {wallet ?? "World App wallet not known yet."}
+      {session ? (
+        <SignedInHome
+          wallet={session.wallet}
+          notifications={notifications}
+          onTurnOnNotifications={() => void turnOnNotifications()}
+        />
+      ) : (
+        <Panel title="Sign in">
+          <p className="text-sm text-muted">
+            Your World App wallet is your AgentLatch account. The first sign-in
+            creates it. Approvals for your agents then come to this phone.
           </p>
-          <p className="mt-2 text-sm text-muted">
-            {linked
-              ? "Linked. Approvals for your agents come to this wallet."
-              : "Not linked yet. Claiming an agent links this phone."}
+          <button
+            type="button"
+            className="mt-4 w-full rounded-md bg-ink px-4 py-3 text-sm font-medium text-paper disabled:opacity-50"
+            disabled={busy}
+            onClick={() => void signIn()}
+          >
+            {busy ? "Signing…" : "Sign in with World App"}
+          </button>
+        </Panel>
+      )}
+    </>
+  );
+}
+
+function SignedInHome({
+  wallet,
+  notifications,
+  onTurnOnNotifications,
+}: {
+  wallet: string;
+  notifications: NotificationState;
+  onTurnOnNotifications: () => void;
+}) {
+  const account = useAccount();
+  const agents = useAgents();
+  const pending = account.data?.pending ?? [];
+
+  return (
+    <div className="grid gap-4">
+      <Panel title="Waiting for you">
+        {pending.length ? (
+          <ul className="grid gap-3">
+            {pending.map((approval) => (
+              <li key={approval.id}>
+                <Link
+                  to="/approve/$approvalId"
+                  params={{ approvalId: approval.id }}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-wait/40 bg-wait-soft px-4 py-3"
+                >
+                  <span className="font-medium">
+                    {approval.action} {formatDollars(approval.amountUsdc)}
+                  </span>
+                  <Pill>{approval.status}</Pill>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Empty>No approval is waiting.</Empty>
+        )}
+      </Panel>
+
+      <Panel title="Notifications">
+        {notifications === "on" ? (
+          <p className="text-sm text-muted">
+            On. Approvals push to this phone.
           </p>
-          {!linked ? (
+        ) : notifications === "blocked" ? (
+          <p className="text-sm text-muted">
+            Off. Turn on notifications for AgentLatch in World App settings,
+            then reopen this page.
+          </p>
+        ) : (
+          <>
+            <p className="text-sm text-muted">
+              Turn on notifications so approvals reach you.
+            </p>
             <button
               type="button"
-              className="mt-3 rounded-md border border-ink px-4 py-2 text-sm font-medium disabled:opacity-50"
-              disabled={busy !== null}
-              onClick={() => void link()}
+              className="mt-3 rounded-md border border-ink px-4 py-2 text-sm font-medium"
+              onClick={onTurnOnNotifications}
             >
-              {busy === LINK_REQUEST_ID ? "Signing…" : "Link this phone"}
+              Turn on notifications
             </button>
-          ) : null}
-        </Panel>
-      </div>
-    </>
+          </>
+        )}
+      </Panel>
+
+      <Panel title="Your agents">
+        {agents.data?.length ? (
+          <ul className="grid gap-2">
+            {agents.data.map((agent) => (
+              <li key={agent.id} className="text-sm font-medium">
+                {agent.ens.name ?? agent.name}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Empty>
+            {agents.isPending ? "Loading…" : "You have no agents yet."}
+          </Empty>
+        )}
+      </Panel>
+
+      <Panel title="This phone">
+        <p className="font-mono text-xs break-all text-muted">{wallet}</p>
+        <p className="mt-2 text-sm text-muted">
+          Signed in. Approvals for your agents come to this wallet.
+        </p>
+        <button
+          type="button"
+          className="mt-3 rounded-md border border-ink px-4 py-2 text-sm font-medium"
+          onClick={clearSession}
+        >
+          Sign out
+        </button>
+      </Panel>
+    </div>
   );
 }

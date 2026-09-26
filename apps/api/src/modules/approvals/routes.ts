@@ -1,5 +1,6 @@
 import { Elysia } from "elysia";
 import { respond } from "../../result";
+import { session } from "../../session";
 import { toApprovalDto } from "./dto";
 import { approvalIdParams, challengeQuery, decideBody } from "./schemas";
 import {
@@ -10,10 +11,15 @@ import {
 } from "./service";
 
 // Approve and deny run only through `decide`, with a World App signature from
-// the wallet that claimed the agent. Approve also needs a World ID for Agents
-// check that the API validates. The agent can read approvals, never decide.
+// the wallet that owns the agent. Approve also needs a World ID for Agents
+// check that the API validates. The agent reads its approval by ID, never decides.
 export const approvalRoutes = new Elysia({ prefix: "/approvals" })
-  .get("/", async () => (await listApprovals()).map(toApprovalDto))
+  .use(session)
+  .get(
+    "/",
+    async ({ owner }) => (await listApprovals(owner.userId)).map(toApprovalDto),
+    { signedIn: true },
+  )
   .get(
     "/:approvalId",
     async ({ params, set }) => {
