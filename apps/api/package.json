@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@agentlatch/core": "workspace:*",
-    "elysia": "^1.4.30"
+    "elysia": "^1.4.30",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2"

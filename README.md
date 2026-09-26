@@ -16,6 +16,8 @@ bun run dev
 - API health: http://localhost:3001/health
 - Agent process stays idle until Phase 3
 
+The API keeps agents, policies, and approvals in memory. `PUT /agents/:id/policy` sets USDC limits. `POST /agents/:id/actions` returns allow, block, or an approval id. Approve or reject at `POST /approvals/:id/approve` and `POST /approvals/:id/reject`. Field details are in `docs/agent/current-state.md`.
+
 ```sh
 bun run typecheck
 bun run lint

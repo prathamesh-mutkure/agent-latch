@@ -1,0 +1,27 @@
+import type { ActionType, Policy } from "@agentlatch/core";
+import { formatUsdc } from "@agentlatch/core";
+
+export type PolicyDto = {
+  agentId: string;
+  autonomousLimitUsdc: string;
+  hardLimitUsdc: string;
+  dailyLimitUsdc: string | null;
+  allowedActions: ActionType[];
+  allowedTokens: string[];
+  allowedTargets: string[];
+  updatedAt: string;
+};
+
+export function toPolicyDto(policy: Policy): PolicyDto {
+  return {
+    agentId: policy.agentId,
+    autonomousLimitUsdc: formatUsdc(policy.autonomousLimit),
+    hardLimitUsdc: formatUsdc(policy.hardLimit),
+    dailyLimitUsdc:
+      policy.dailyLimit === null ? null : formatUsdc(policy.dailyLimit),
+    allowedActions: policy.allowedActions,
+    allowedTokens: policy.allowedTokens,
+    allowedTargets: policy.allowedTargets,
+    updatedAt: policy.updatedAt,
+  };
+}

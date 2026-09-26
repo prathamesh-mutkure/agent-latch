@@ -1,18 +1,21 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { packageId } from "@agentlatch/core";
 import { Elysia } from "elysia";
+import { actionRoutes } from "./modules/actions/routes";
+import { agentsRoutes } from "./modules/agents/routes";
+import { approvalRoutes } from "./modules/approvals/routes";
+import { healthRoutes } from "./modules/health/routes";
 
 const rootEnv = resolve(import.meta.dir, "../../../.env");
 if (existsSync(rootEnv)) {
   process.loadEnvFile(rootEnv);
 }
 
-export const app = new Elysia().get("/health", () => ({
-  ok: true as const,
-  service: "agentlatch-api",
-  core: packageId,
-}));
+export const app = new Elysia()
+  .use(healthRoutes)
+  .use(agentsRoutes)
+  .use(actionRoutes)
+  .use(approvalRoutes);
 
 if (import.meta.main) {
   const port = Number(process.env.PORT ?? 3001);

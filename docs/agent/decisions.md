@@ -33,7 +33,7 @@ From `planning.md`, treated as closed:
 ## 2026-09-26 — Hackathon constraints
 
 - No unit tests. Do not add a test runner, test files, or a CI test step. Typecheck and lint are the checks. The demo is the verification. This supersedes "run tests" in `planning.md` for this hackathon.
-- Demo signer is one Ethereum Sepolia private key in `EXECUTOR_PRIVATE_KEY`. Only the executor reads it, with viem `privateKeyToAccount`. It signs only after `ALLOW` or a still-valid scoped approval for that exact action. Policy and the API do not sign. This is a testnet hot wallet, the same pattern as AgentKit and typical x402 examples, not production custody.
+- Demo signer was one Ethereum Sepolia private key. Superseded the same day by "Signer is its own module" below. Policy and the API still do not sign.
 - One chain: Ethereum Sepolia, chain id `11155111`.
 - One asset: Circle USDC at `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238`, 6 decimals. Policy amounts are USDC and display as dollars. No price oracle.
 - x402 uses that same USDC on Sepolia (`ethereum-sepolia` / `eip155:11155111`). Coinbase's CDP facilitator does not list Ethereum Sepolia. Use a facilitator that does. Do not add Base to follow the CDP list.
@@ -41,6 +41,25 @@ From `planning.md`, treated as closed:
 - No login in Phase 1. A wallet-signed owner session comes when the dashboard needs an owner. World ID stays the Phase 5 step-up for exceptional actions, not the login.
 - The repo is public and open source. Do not add a license file unless a sponsor form requires one.
 - `AGENTS.md` is the agent entrypoint for Cursor and Codex. `CLAUDE.md` only pulls in `AGENTS.md` for Claude Code. Do not keep a second copy of the rules.
+
+## 2026-09-26 — API modules
+
+- HTTP is split by resource under `apps/api/src/modules/{health,agents,actions,approvals}`. Each resource has `routes.ts`, Zod `schemas.ts`, `dto.ts`, and `service.ts`.
+- Response mappers are `toPolicyDto`, `toActionDto`, and `toApprovalDto`. Agents are returned as stored because that shape is already the response.
+- Request validation is Zod. Elysia accepts it through Standard Schema. Do not add TypeBox `t` schemas.
+- `@agentlatch/core` stays free of Zod and HTTP. The in-memory store stays in `memory.ts`.
+
+## 2026-09-26 — Signer is its own module
+
+Supersedes the demo-signer bullet in "Hackathon constraints".
+
+Signing is a third axis, next to policy and executors. Policy decides whether an action may happen. An executor performs one kind of action. A signer produces the signature for that action. None of the three imports the others' implementations.
+
+- The interface is `AgentSigner`: the agent address, plus `sign` for one already-authorized action. It will live in `@agentlatch/core` when the first real signer is added. Do not add it before then.
+- An executor receives a signer. It does not read `EXECUTOR_PRIVATE_KEY`, construct a viem account, or import Alchemy.
+- `LocalKeySigner` is the hackathon default: one Sepolia private key in `EXECUTOR_PRIVATE_KEY`, viem `privateKeyToAccount`. It signs only after `ALLOW` or a still-valid scoped approval for that exact action. Testnet hot wallet, not production custody.
+- `AlchemySmartAccountSigner` is an optional extension, not the default and not Phase 2. It submits an ERC-4337 user operation through Alchemy Account Kit. The smart account address is the agent wallet. The owner key can still be the same demo key. Alchemy does not replace authorization.
+- Owner login, when it exists, is a separate wallet. Do not use the agent signer for the dashboard session.
 
 ## How to change a decision
 

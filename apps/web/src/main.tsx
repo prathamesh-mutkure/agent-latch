@@ -31,7 +31,8 @@ const indexRoute = createRoute({
           Control plane for autonomous agents
         </h1>
         <p className="max-w-xl text-lg text-zinc-600">
-          Repository scaffold. Product behavior starts in Phase 1.
+          The control plane is the API on port 3001. It allows, blocks, or asks
+          for approval. The dashboard comes later.
         </p>
       </main>
     );
