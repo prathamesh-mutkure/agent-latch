@@ -255,19 +255,11 @@ function AgentKey({ agentId, hasKey }: { agentId: string; hasKey: boolean }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [key, setKey] = useState<string | null>(null);
-  const snippet = `{
-  "mcpServers": {
-    "dsap": {
-      "command": "bun",
-      "args": ["apps/mcp/src/index.ts"],
-      "env": {
-        "API_URL": "${window.location.origin}/api",
-        "AGENT_ID": "${agentId}",
-        "AGENT_KEY": "${key ?? "<the key shown once>"}"
-      }
-    }
-  }
-}`;
+  const snippet = `claude mcp add dsap \\
+  -e API_URL=https://dsap-protocol.onrender.com \\
+  -e AGENT_ID=${agentId} \\
+  -e AGENT_KEY=${key ?? "<the key shown once>"} \\
+  -- bun "$PWD/apps/mcp/src/index.ts"`;
 
   async function onIssue() {
     setPending(true);
